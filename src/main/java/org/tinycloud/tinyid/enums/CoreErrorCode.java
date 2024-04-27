@@ -1,7 +1,7 @@
 package org.tinycloud.tinyid.enums;
 
 public enum CoreErrorCode {
-    MOCK_ADDRESS_RESOLUTION_ERROR(1001, "Mock地址解析错误！"),
+    THIS_IDCODE_IS_NOT_EXIST(1001, "此idCode不存在！"),
 
     ;
 

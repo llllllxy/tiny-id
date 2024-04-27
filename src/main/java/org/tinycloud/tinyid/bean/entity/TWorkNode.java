@@ -2,6 +2,7 @@ package org.tinycloud.tinyid.bean.entity;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -16,6 +17,7 @@ import java.util.Date;
  */
 @Getter
 @Setter
+@ToString
 public class TWorkNode implements Serializable {
     @Serial
     private static final long serialVersionUID = -1L;

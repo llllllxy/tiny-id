@@ -38,5 +38,5 @@ public class GlobalConstant {
     /**
      * session key
      */
-    public static String SESSION_KEY = "loginId";
+    public static final String SESSION_KEY = "loginId";
 }
