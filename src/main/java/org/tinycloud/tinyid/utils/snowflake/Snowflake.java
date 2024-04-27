@@ -12,7 +12,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * 优化开源项目：https://gitee.com/yu120/sequence
  *
  * @author liuxingyu01
- * @version 2023-07-26 15:11:53
+ * @version 2024-04-27 15:11:53
  */
 public class Snowflake {
     private static final Logger logger = LoggerFactory.getLogger(Snowflake.class);

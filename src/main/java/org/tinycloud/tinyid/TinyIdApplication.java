@@ -5,9 +5,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.tinycloud.tinyid.utils.LocalHostUtils;
 
 @Slf4j
+@EnableScheduling
 @SpringBootApplication
 public class TinyIdApplication {
 

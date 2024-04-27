@@ -11,9 +11,15 @@ package org.tinycloud.tinyid.utils.snowflake;
  */
 public class SnowflakeSingleton {
 
+    public static long workerId;
+
+    public static long datacenterId;
+
     private static Snowflake snowflakeObj;
 
     public static void init(long workerId, long datacenterId) {
+        SnowflakeSingleton.workerId = workerId;
+        SnowflakeSingleton.datacenterId = datacenterId;
         snowflakeObj = new Snowflake(workerId, datacenterId);
     }
 

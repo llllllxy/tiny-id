@@ -11,13 +11,13 @@ import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
  * </p>
  *
  * @author liuxingyu01
- * @since 2024-04-2024/4/27 14:11
+ * @since 2024-04-27 14:11
  */
 @RestController
 public class TinyIdController {
 
     @RequestMapping(value = "/api/snowflake/get", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<Long> getSnowflakeId() {
-        return ApiResult.success(SnowflakeSingleton.nextLongId(), "查询成功");
+        return ApiResult.success(SnowflakeSingleton.nextLongId(), "获取成功");
     }
 }
