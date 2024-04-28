@@ -55,7 +55,7 @@ CREATE TABLE `t_idtable`  (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '自增主键，内码',
   `id_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '业务流水号标识编码',
   `id_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '业务流水号名称',
-  `id_value` bigint(20) NOT NULL DEFAULT 1 COMMENT '业务流水号当前值',
+  `id_value` bigint(20) NOT NULL DEFAULT 0 COMMENT '业务流水号当前值',
   `id_step` int(11) NULL DEFAULT NULL COMMENT '步长',
   `id_length` int(11) NOT NULL COMMENT '业务流水号长度',
   `has_prefix` tinyint(4) NOT NULL COMMENT '是否有前缀 1有 0无',

@@ -31,6 +31,20 @@ public class IdTableUtils {
     public static final Map<String, ArrayBlockingQueue<String>> cacheMap = new ConcurrentHashMap<>();
 
 
+    private static volatile IdTableDao idTableDao;
+
+    private static IdTableDao getIdTableDao() {
+        if (idTableDao == null) {
+            synchronized (IdTableUtils.class) {
+                if (idTableDao == null) {
+                    idTableDao = SpringUtils.getBean(IdTableDao.class);
+                }
+            }
+        }
+        return idTableDao;
+    }
+
+
     /**
      * 获取下一个流水号字符串
      *
@@ -51,13 +65,19 @@ public class IdTableUtils {
         ArrayBlockingQueue<String> queue = cacheMap.get(idCode);
         // 没有这个队列的话，那就新建一个队列
         if (queue == null) {
-            throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
+            TIdTable idTable = getIdTableDao().get(idCode);
+            if (idTable == null) {
+                throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
+            } else {
+                queue = new ArrayBlockingQueue<>(idTable.getIdStep());
+                cacheMap.put(idCode, queue);
+            }
         }
         // 获取队列缓存的长度，判断是否大于0
         if (queue.size() > 0) {
             return queue.poll();
         }
-
+        // 按照步长，生成id推送到队列里
         List<String> ids = generateNextIds(idCode);
         ids.forEach(queue::offer);
 
@@ -73,13 +93,13 @@ public class IdTableUtils {
      * @return List<String> 流水号列表
      */
     private static List<String> generateNextIds(String idCode) {
-        TIdTable idTable = SpringUtils.getBean(IdTableDao.class).getIdTableByIdCode(idCode);
+        TIdTable idTable = getIdTableDao().refreshByIdCode(idCode);
 
         List<String> nextIds = new ArrayList<>();
         // 获取流水号的当前值
         long idValue = idTable.getIdValue();
         // 循环获取100个流水号，放入nextIds中去
-        for (int i = idTable.getIdStep(); i >= 1; i--) {
+        for (int i = idTable.getIdStep() - 1; i >= 0; i--) {
             long nextIdValue = idValue - i;
             String nextId = generateNextId(idTable, nextIdValue);
             nextIds.add(nextId);
@@ -103,12 +123,12 @@ public class IdTableUtils {
             // 是否有前缀 1有，0没有
             Integer hasPrefix = idTable.getHasPrefix();
             // 前缀内容
-            String idPrefix = Optional.ofNullable(idTable.getIdPrefix()).orElse("").toString();
+            String idPrefix = Optional.ofNullable(idTable.getIdPrefix()).orElse("");
             idPrefix = compoundAffix(hasPrefix, idPrefix, dateTime);
 
             // 是否有后缀 1有，0没有
             Integer hasSuffix = idTable.getHasSuffix();
-            String idSuffix = Optional.ofNullable(idTable.getIdSuffix()).orElse("").toString();
+            String idSuffix = Optional.ofNullable(idTable.getIdSuffix()).orElse("");
             // 后缀内容
             idSuffix = compoundAffix(hasSuffix, idSuffix, dateTime);
 
@@ -164,7 +184,7 @@ public class IdTableUtils {
      *                 <p>mm：生成的流水号将该字符串替换为11</p>
      *                 <p>ss：生成的流水号将该字符串替换为23</p>
      *                 <p>以上日期时间字符，yyyyMMddHHmmss，区分大小写</p>
-     * @return
+     * @return 转换后的前缀和后缀
      */
     private static String compoundAffix(Integer isAffix, String affix, Date dateTime) {
         if (isAffix != null && isAffix.equals(1)) {
@@ -181,13 +201,13 @@ public class IdTableUtils {
 
 
     /**
-     * 得到日期字符串 默认格式（yyyy-MM-dd） pattern可以为："yyyy-MM-dd" "HH:mm:ss" "E"
+     * 得到日期字符串 默认格式（yyyyMMdd） pattern可以为："yyyy-MM-dd" "HH:mm:ss" "E"
      */
     public static String formatDate(Date date, String pattern) {
         String formatDate = null;
         if (date != null) {
             if (StringUtils.isBlank(pattern)) {
-                pattern = "yyyy-MM-dd";
+                pattern = "yyyyMMdd";
             }
             formatDate = FastDateFormat.getInstance(pattern).format(date);
         }

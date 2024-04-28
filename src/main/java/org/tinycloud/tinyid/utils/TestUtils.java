@@ -13,6 +13,7 @@ import java.util.concurrent.Executors;
 
 /**
  * <p>
+ * 测试脚本程序
  * </p>
  *
  * @author liuxingyu01
@@ -22,30 +23,34 @@ public class TestUtils {
 
     public static void main(String[] args) {
 
-        ExecutorService executor = Executors.newFixedThreadPool(10);
-
+        ExecutorService executor = Executors.newFixedThreadPool(20);
         final Set<String> sets = new HashSet<>();
 
         HttpClient client = HttpClient.newBuilder().build();
-        HttpRequest request1 = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:9999/api/segment/get"))
-                .header("userHeader", "myHeader")
-                .header("cookie", "JSESSIONID=111")
-                .timeout(Duration.ofSeconds(100))
-                .GET()
-                .build();
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 500; i++) {
+            HttpRequest request1;
+            if (i % 2 == 0) {
+                request1 = HttpRequest.newBuilder()
+                        .uri(URI.create("http://localhost:9999/api/segment/get/YYY"))
+                        .timeout(Duration.ofSeconds(10))
+                        .GET()
+                        .build();
+            } else {
+                request1 = HttpRequest.newBuilder()
+                        .uri(URI.create("http://localhost:9998/api/segment/get/YYY"))
+                        .timeout(Duration.ofSeconds(10))
+                        .GET()
+                        .build();
+            }
+
             executor.execute(() -> {
                 try {
-                    System.out.println("同步请求2开始");
                     HttpResponse<String> response = client.send(request1, HttpResponse.BodyHandlers.ofString());
-
-                    System.out.println("同步请求2:" + response.body());
-
                     Map<String, Object> responseMap = JsonUtils.readMap(response.body());
-
-                    boolean result = sets.add(responseMap.get("data").toString());
+                    String id = responseMap.get("data").toString();
+                    System.out.println(id);
+                    boolean result = sets.add(id);
                     if (!result) {
                         System.out.println("Error occurred result: " + result);
                     }
