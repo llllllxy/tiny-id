@@ -168,19 +168,17 @@ public class IdTableUtils {
     private static String generateNextId(TIdTable idTable, long nextIdValue) {
         String retStr = "";
         try {
-            Date dateTime = new Date();
-
             // 是否有前缀 1有，0没有
             Integer hasPrefix = idTable.getHasPrefix();
             // 前缀内容
             String idPrefix = Optional.ofNullable(idTable.getIdPrefix()).orElse("");
-            idPrefix = compoundAffix(hasPrefix, idPrefix, dateTime);
+            idPrefix = compoundAffix(hasPrefix, idPrefix);
 
             // 是否有后缀 1有，0没有
             Integer hasSuffix = idTable.getHasSuffix();
             String idSuffix = Optional.ofNullable(idTable.getIdSuffix()).orElse("");
             // 后缀内容
-            idSuffix = compoundAffix(hasSuffix, idSuffix, dateTime);
+            idSuffix = compoundAffix(hasSuffix, idSuffix);
 
             // 长度
             int idLen = idTable.getIdLength() == null ? 10 : idTable.getIdLength();
@@ -221,24 +219,24 @@ public class IdTableUtils {
     /**
      * 完善前缀和后缀
      *
-     * @param isAffix  是否有前缀或者后缀 1有 0无
-     * @param affix    前缀或者后缀内容
-     * @param dateTime 当前时间
-     *                 特别说明如下：
-     *                 <p>假设当前时间为2019年2月25日3时11分23秒，如果前缀或后缀包含下列字符串</p>
-     *                 <p>yyyy：生成的流水号将该字符串替换为2019</p>
-     *                 <p>yy：生成的流水号将该字符串替换为19</p>
-     *                 <p>MM：生成的流水号将该字符串替换为02</p>
-     *                 <p>dd：生成的流水号将该字符串替换为25</p>
-     *                 <p>HH：生成的流水号将该字符串替换为03</p>
-     *                 <p>mm：生成的流水号将该字符串替换为11</p>
-     *                 <p>ss：生成的流水号将该字符串替换为23</p>
-     *                 <p>以上日期时间字符，yyyyMMddHHmmss，区分大小写</p>
+     * @param isAffix 是否有前缀或者后缀 1有 0无
+     * @param affix   前缀或者后缀内容
+     *                特别说明如下：
+     *                <p>假设当前时间为2019年2月25日3时11分23秒，如果前缀或后缀包含下列字符串</p>
+     *                <p>yyyy：生成的流水号将该字符串替换为2019</p>
+     *                <p>yy：生成的流水号将该字符串替换为19</p>
+     *                <p>MM：生成的流水号将该字符串替换为02</p>
+     *                <p>dd：生成的流水号将该字符串替换为25</p>
+     *                <p>HH：生成的流水号将该字符串替换为03</p>
+     *                <p>mm：生成的流水号将该字符串替换为11</p>
+     *                <p>ss：生成的流水号将该字符串替换为23</p>
+     *                <p>以上日期时间字符，yyyyMMddHHmmss，区分大小写</p>
      * @return 转换后的前缀和后缀
      */
-    private static String compoundAffix(Integer isAffix, String affix, Date dateTime) {
+    private static String compoundAffix(Integer isAffix, String affix) {
         if (isAffix != null && isAffix.equals(1)) {
             if (StringUtils.isNotBlank(affix)) {
+                Date dateTime = new Date();
                 affix = affix.trim();
                 for (String format : AFFIX_FORMAT) {
                     affix = affix.replace(format, formatDate(dateTime, format));
