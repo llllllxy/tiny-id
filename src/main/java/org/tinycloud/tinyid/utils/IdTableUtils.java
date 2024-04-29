@@ -32,6 +32,7 @@ public class IdTableUtils {
 
     public static final Map<String, ConcurrentLinkedQueue<String>> queueCacheMap = new ConcurrentHashMap<>();
 
+    /* 存储每个 idCode 对应的步长数据 */
     public static final Map<String, Integer> stepCacheMap = new ConcurrentHashMap<>();
 
     /* 存储每个 idCode 对应的预加载状态 */
@@ -106,26 +107,11 @@ public class IdTableUtils {
                     throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
                 } else {
                     queue = new ConcurrentLinkedQueue<>();
-                    stepCacheMap.put(idCode, idTable.getIdStep());
                     queueCacheMap.put(idCode, queue);
                 }
             }
             // 获取队列缓存的长度，判断是否大于0
             if (queue.size() > 0) {
-                // 当剩余不足时，异步预加载下一号段
-                if (!preloadedCacheMap.getOrDefault(idCode, Boolean.FALSE)
-                        && queue.size() <= (stepCacheMap.get(idCode) * GlobalConstant.LOADING_PERCENT / 100)) {
-                    // 设置正在进行预加载的标志
-                    preloadedCacheMap.put(idCode, Boolean.TRUE);
-                    final ConcurrentLinkedQueue<String> finalQueue = queue;
-                    getThreadPoolTaskExecutor().execute(() -> {
-                        // 按照步长，生成id推送到队列里
-                        List<String> ids = generateNextIds(idCode);
-                        ids.forEach(finalQueue::offer);
-                        // 移除正在进行预加载的标志
-                        preloadedCacheMap.put(idCode, Boolean.FALSE);
-                    });
-                }
                 return queue.poll();
             } else {
                 // 按照步长，生成id推送到队列里
