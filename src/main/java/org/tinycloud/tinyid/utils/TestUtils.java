@@ -28,22 +28,13 @@ public class TestUtils {
 
         HttpClient client = HttpClient.newBuilder().build();
 
-        for (int i = 0; i < 500; i++) {
-            HttpRequest request1;
-            if (i % 2 == 0) {
-                request1 = HttpRequest.newBuilder()
-                        .uri(URI.create("http://localhost:9999/api/segment/get/YYY"))
-                        .timeout(Duration.ofSeconds(10))
-                        .GET()
-                        .build();
-            } else {
-                request1 = HttpRequest.newBuilder()
-                        .uri(URI.create("http://localhost:9998/api/segment/get/YYY"))
-                        .timeout(Duration.ofSeconds(10))
-                        .GET()
-                        .build();
-            }
+        HttpRequest request1 = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:9999/api/segment/get/XXX"))
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build();
 
+        for (int i = 0; i < 5006; i++) {
             executor.execute(() -> {
                 try {
                     HttpResponse<String> response = client.send(request1, HttpResponse.BodyHandlers.ofString());

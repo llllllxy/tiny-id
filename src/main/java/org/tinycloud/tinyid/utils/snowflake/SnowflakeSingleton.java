@@ -1,6 +1,9 @@
 package org.tinycloud.tinyid.utils.snowflake;
 
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * <p>
  * 唯一ID工具-IdUtil
@@ -35,9 +38,24 @@ public class SnowflakeSingleton {
     /**
      * 生成雪花id
      *
-     * @return long
+     * @return id
      */
     public static long nextLongId() {
         return snowflakeObj.nextId();
+    }
+
+
+    /**
+     * 批量生成雪花id
+     *
+     * @return id列表
+     */
+    public static List<Long> nextBatchLongId(int batchSize) {
+        List<Long> idList = new ArrayList<>();
+        for (int i = 0; i < batchSize; i++) {
+            long id = snowflakeObj.nextId();
+            idList.add(id);
+        }
+        return idList;
     }
 }

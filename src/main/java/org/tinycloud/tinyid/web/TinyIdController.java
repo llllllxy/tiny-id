@@ -8,6 +8,8 @@ import org.tinycloud.tinyid.model.ApiResult;
 import org.tinycloud.tinyid.utils.IdTableUtils;
 import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
 
+import java.util.List;
+
 /**
  * <p>
  * </p>
@@ -23,8 +25,19 @@ public class TinyIdController {
         return ApiResult.success(SnowflakeSingleton.nextLongId(), "获取成功");
     }
 
+    @RequestMapping(value = "/api/snowflake/batch/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
+    public ApiResult<List<Long>> getSnowflakeId(@PathVariable("batchSize") Integer batchSize) {
+        return ApiResult.success(SnowflakeSingleton.nextBatchLongId(batchSize), "批量获取成功");
+    }
+
     @RequestMapping(value = "/api/segment/get/{idCode}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<String> getSegment(@PathVariable("idCode") String idCode) {
         return ApiResult.success(IdTableUtils.nextId(idCode), "获取成功");
+    }
+
+    @RequestMapping(value = "/api/segment/get/{idCode}/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
+    public ApiResult<List<String>> getSegment(@PathVariable("idCode") String idCode,
+                                              @PathVariable("batchSize") Integer batchSize) {
+        return ApiResult.success(IdTableUtils.nextBatchId(idCode, batchSize), "批量获取成功");
     }
 }

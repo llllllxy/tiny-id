@@ -4,14 +4,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.tinycloud.tinyid.bean.entity.TIdTable;
+import org.tinycloud.tinyid.constant.GlobalConstant;
 import org.tinycloud.tinyid.dao.IdTableDao;
 import org.tinycloud.tinyid.enums.CoreErrorCode;
 import org.tinycloud.tinyid.exception.CoreException;
 
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * <p>
@@ -28,7 +30,12 @@ public class IdTableUtils {
     private static final String[] AFFIX_FORMAT = {"yyyy", "yy", "MM", "dd", "HH", "mm", "ss"};
 
 
-    public static final Map<String, ArrayBlockingQueue<String>> cacheMap = new ConcurrentHashMap<>();
+    public static final Map<String, ConcurrentLinkedQueue<String>> queueCacheMap = new ConcurrentHashMap<>();
+
+    public static final Map<String, Integer> stepCacheMap = new ConcurrentHashMap<>();
+
+    /* 存储每个 idCode 对应的预加载状态 */
+    public static final Map<String, Boolean> preloadedCacheMap = new ConcurrentHashMap<>();
 
 
     private static volatile IdTableDao idTableDao;
@@ -44,6 +51,19 @@ public class IdTableUtils {
         return idTableDao;
     }
 
+
+    private static volatile ThreadPoolTaskExecutor threadPoolTaskExecutor;
+
+    private static ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
+        if (threadPoolTaskExecutor == null) {
+            synchronized (IdTableUtils.class) {
+                if (threadPoolTaskExecutor == null) {
+                    threadPoolTaskExecutor = SpringUtils.getBean("asyncServiceExecutor");
+                }
+            }
+        }
+        return threadPoolTaskExecutor;
+    }
 
     /**
      * 获取下一个流水号字符串
@@ -61,28 +81,58 @@ public class IdTableUtils {
      * @param idCode 流水号编码
      * @return String 流水号字符串
      */
+    public static List<String> nextBatchId(String idCode, Integer batchSize) {
+        List<String> idList = new ArrayList<>();
+        for (int i = 0; i < batchSize; i++) {
+            String id = takeNextId(idCode);
+            idList.add(id);
+        }
+        return idList;
+    }
+
+    /**
+     * 获取下一个流水号字符串
+     *
+     * @param idCode 流水号编码
+     * @return String 流水号字符串
+     */
     public static String takeNextId(String idCode) {
-        ArrayBlockingQueue<String> queue = cacheMap.get(idCode);
-        // 没有这个队列的话，那就新建一个队列
-        if (queue == null) {
-            TIdTable idTable = getIdTableDao().get(idCode);
-            if (idTable == null) {
-                throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
+        while (true) {
+            ConcurrentLinkedQueue<String> queue = queueCacheMap.get(idCode);
+            // 没有这个队列的话，那就新建一个队列
+            if (queue == null) {
+                TIdTable idTable = getIdTableDao().get(idCode);
+                if (idTable == null) {
+                    throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
+                } else {
+                    queue = new ConcurrentLinkedQueue<>();
+                    stepCacheMap.put(idCode, idTable.getIdStep());
+                    queueCacheMap.put(idCode, queue);
+                }
+            }
+            // 获取队列缓存的长度，判断是否大于0
+            if (queue.size() > 0) {
+                // 当剩余不足时，异步预加载下一号段
+                if (!preloadedCacheMap.getOrDefault(idCode, Boolean.FALSE)
+                        && queue.size() <= (stepCacheMap.get(idCode) * GlobalConstant.LOADING_PERCENT / 100)) {
+                    // 设置正在进行预加载的标志
+                    preloadedCacheMap.put(idCode, Boolean.TRUE);
+                    final ConcurrentLinkedQueue<String> finalQueue = queue;
+                    getThreadPoolTaskExecutor().execute(() -> {
+                        // 按照步长，生成id推送到队列里
+                        List<String> ids = generateNextIds(idCode);
+                        ids.forEach(finalQueue::offer);
+                        // 移除正在进行预加载的标志
+                        preloadedCacheMap.put(idCode, Boolean.FALSE);
+                    });
+                }
+                return queue.poll();
             } else {
-                queue = new ArrayBlockingQueue<>(idTable.getIdStep());
-                cacheMap.put(idCode, queue);
+                // 按照步长，生成id推送到队列里
+                List<String> ids = generateNextIds(idCode);
+                ids.forEach(queue::offer);
             }
         }
-        // 获取队列缓存的长度，判断是否大于0
-        if (queue.size() > 0) {
-            return queue.poll();
-        }
-        // 按照步长，生成id推送到队列里
-        List<String> ids = generateNextIds(idCode);
-        ids.forEach(queue::offer);
-
-        // 递归调用，直到 queue.size() > 0
-        return takeNextId(idCode);
     }
 
 
@@ -93,8 +143,8 @@ public class IdTableUtils {
      * @return List<String> 流水号列表
      */
     private static List<String> generateNextIds(String idCode) {
+        // 刷新数据库里的步长
         TIdTable idTable = getIdTableDao().refreshByIdCode(idCode);
-
         List<String> nextIds = new ArrayList<>();
         // 获取流水号的当前值
         long idValue = idTable.getIdValue();
