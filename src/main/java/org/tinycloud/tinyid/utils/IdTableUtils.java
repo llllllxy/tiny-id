@@ -71,7 +71,7 @@ public class IdTableUtils {
      * @param idCode 流水号编码
      * @return String 流水号字符串
      */
-    public synchronized static String nextId(String idCode) {
+    public static String nextId(String idCode) {
         return takeNextId(idCode);
     }
 
@@ -96,7 +96,7 @@ public class IdTableUtils {
      * @param idCode 流水号编码
      * @return String 流水号字符串
      */
-    public static String takeNextId(String idCode) {
+    public synchronized static String takeNextId(String idCode) {
         while (true) {
             ConcurrentLinkedQueue<String> queue = queueCacheMap.get(idCode);
             // 没有这个队列的话，那就新建一个队列
