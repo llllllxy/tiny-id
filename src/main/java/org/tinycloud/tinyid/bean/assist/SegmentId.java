@@ -41,7 +41,7 @@ public final class SegmentId {
         this.step = step;
     }
 
-    public Boolean getPreloaded() {
+    public Boolean isPreloaded() {
         return preloaded;
     }
 

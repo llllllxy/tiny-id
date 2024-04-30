@@ -34,12 +34,10 @@ public class IdTableUtils {
 
     private static final String[] AFFIX_FORMAT = {"yyyy", "yy", "MM", "dd", "HH", "mm", "ss"};
 
-
-    public static final Map<String, SegmentId> queueCacheMap = new ConcurrentHashMap<>();
+    public static final Map<String, SegmentId> segmentIdCacheMap = new ConcurrentHashMap<>();
 
 
     private static volatile IdTableDao idTableDao;
-
     private static IdTableDao getIdTableDao() {
         if (idTableDao == null) {
             synchronized (IdTableUtils.class) {
@@ -53,7 +51,6 @@ public class IdTableUtils {
 
 
     private static volatile ThreadPoolTaskExecutor threadPoolTaskExecutor;
-
     private static ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
         if (threadPoolTaskExecutor == null) {
             synchronized (IdTableUtils.class) {
@@ -98,7 +95,7 @@ public class IdTableUtils {
      */
     public synchronized static String takeNextId(String idCode) {
         while (true) {
-            SegmentId segmentId = queueCacheMap.get(idCode);
+            SegmentId segmentId = segmentIdCacheMap.get(idCode);
             // 没有这个队列的话，那就新建一个队列
             if (segmentId == null) {
                 TIdTable idTable = getIdTableDao().get(idCode);
@@ -107,14 +104,14 @@ public class IdTableUtils {
                 } else {
                     ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
                     segmentId = new SegmentId(queue, idTable.getIdStep());
-                    queueCacheMap.put(idCode, segmentId);
+                    segmentIdCacheMap.put(idCode, segmentId);
                 }
             }
             // 获取队列缓存的长度，判断是否大于0
             final ConcurrentLinkedQueue<String> queue = segmentId.getQueue();
             if (queue.size() > 0) {
                 // 当剩余不足时，异步预加载下一号段
-                if (!segmentId.getPreloaded()
+                if (!segmentId.isPreloaded()
                         && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
                     SegmentId finalSegmentId = segmentId;
                     Future<?> future = getThreadPoolTaskExecutor().submit(() -> {
@@ -130,7 +127,7 @@ public class IdTableUtils {
                 }
                 return queue.poll();
             } else {
-                if (segmentId.getPreloaded()) {
+                if (segmentId.isPreloaded()) {
                     // 等待异步线程返回
                     try {
                         segmentId.getFuture().get();
