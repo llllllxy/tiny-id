@@ -40,4 +40,9 @@ public class TinyIdController {
                                               @PathVariable("batchSize") Integer batchSize) {
         return ApiResult.success(IdTableUtils.nextBatchId(idCode, batchSize), "批量获取成功");
     }
+
+    @RequestMapping(value = "/api/test", method = {RequestMethod.GET, RequestMethod.POST})
+    public ApiResult<String> hhh() {
+        return ApiResult.success(null, "测试成功");
+    }
 }

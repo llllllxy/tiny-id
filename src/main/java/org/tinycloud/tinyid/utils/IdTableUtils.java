@@ -5,15 +5,20 @@ import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.tinycloud.tinyid.bean.assist.SegmentId;
 import org.tinycloud.tinyid.bean.entity.TIdTable;
 import org.tinycloud.tinyid.constant.GlobalConstant;
 import org.tinycloud.tinyid.dao.IdTableDao;
 import org.tinycloud.tinyid.enums.CoreErrorCode;
 import org.tinycloud.tinyid.exception.CoreException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 
 /**
  * <p>
@@ -30,13 +35,7 @@ public class IdTableUtils {
     private static final String[] AFFIX_FORMAT = {"yyyy", "yy", "MM", "dd", "HH", "mm", "ss"};
 
 
-    public static final Map<String, ConcurrentLinkedQueue<String>> queueCacheMap = new ConcurrentHashMap<>();
-
-    /* 存储每个 idCode 对应的步长数据 */
-    public static final Map<String, Integer> stepCacheMap = new ConcurrentHashMap<>();
-
-    /* 存储每个 idCode 对应的预加载状态 */
-    public static final Map<String, Boolean> preloadedCacheMap = new ConcurrentHashMap<>();
+    public static final Map<String, SegmentId> queueCacheMap = new ConcurrentHashMap<>();
 
 
     private static volatile IdTableDao idTableDao;
@@ -99,24 +98,50 @@ public class IdTableUtils {
      */
     public synchronized static String takeNextId(String idCode) {
         while (true) {
-            ConcurrentLinkedQueue<String> queue = queueCacheMap.get(idCode);
+            SegmentId segmentId = queueCacheMap.get(idCode);
             // 没有这个队列的话，那就新建一个队列
-            if (queue == null) {
+            if (segmentId == null) {
                 TIdTable idTable = getIdTableDao().get(idCode);
                 if (idTable == null) {
                     throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
                 } else {
-                    queue = new ConcurrentLinkedQueue<>();
-                    queueCacheMap.put(idCode, queue);
+                    ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
+                    segmentId = new SegmentId(queue, idTable.getIdStep());
+                    queueCacheMap.put(idCode, segmentId);
                 }
             }
             // 获取队列缓存的长度，判断是否大于0
+            final ConcurrentLinkedQueue<String> queue = segmentId.getQueue();
             if (queue.size() > 0) {
+                // 当剩余不足时，异步预加载下一号段
+                if (!segmentId.getPreloaded()
+                        && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
+                    SegmentId finalSegmentId = segmentId;
+                    Future<?> future = getThreadPoolTaskExecutor().submit(() -> {
+                        // 按照步长，生成id推送到队列里
+                        List<String> ids = generateNextIds(idCode);
+                        ids.forEach(queue::offer);
+                        // 移除正在进行预加载的标志
+                        finalSegmentId.setPreloaded(false);
+                    });
+                    // 设置正在进行预加载的标志
+                    segmentId.setPreloaded(true);
+                    segmentId.setFuture(future);
+                }
                 return queue.poll();
             } else {
-                // 按照步长，生成id推送到队列里
-                List<String> ids = generateNextIds(idCode);
-                ids.forEach(queue::offer);
+                if (segmentId.getPreloaded()) {
+                    // 等待异步线程返回
+                    try {
+                        segmentId.getFuture().get();
+                    } catch (Exception e) {
+                        logger.error("error query segmentId: {}", e.getMessage(), e);
+                    }
+                } else {
+                    // 第一次加载，按照步长，生成id推送到队列里
+                    List<String> ids = generateNextIds(idCode);
+                    ids.forEach(queue::offer);
+                }
             }
         }
     }
@@ -154,34 +179,35 @@ public class IdTableUtils {
     private static String generateNextId(TIdTable idTable, long nextIdValue) {
         String retStr = "";
         try {
-            // 是否有前缀 1有，0没有
+            // 补充前缀内容
             Integer hasPrefix = idTable.getHasPrefix();
-            // 前缀内容
-            String idPrefix = Optional.ofNullable(idTable.getIdPrefix()).orElse("");
+            String idPrefix = idTable.getIdPrefix() != null ? idTable.getIdPrefix() : "";
             idPrefix = compoundAffix(hasPrefix, idPrefix);
 
-            // 是否有后缀 1有，0没有
+            // 补充后缀内容
             Integer hasSuffix = idTable.getHasSuffix();
-            String idSuffix = Optional.ofNullable(idTable.getIdSuffix()).orElse("");
-            // 后缀内容
+            String idSuffix = idTable.getIdSuffix() != null ? idTable.getIdSuffix() : "";
             idSuffix = compoundAffix(hasSuffix, idSuffix);
 
-            // 长度
-            int idLen = idTable.getIdLength() == null ? 10 : idTable.getIdLength();
-            int numLen = idLen - idPrefix.length() - idSuffix.length();
+            // id长度
+            int numLen = idTable.getIdLength() - idPrefix.length() - idSuffix.length();
             if (numLen < String.valueOf(nextIdValue).length()) {
-                logger.error("generateNextId -- 编码长度不够，请增加编码长度!");
-                throw new RuntimeException("编码长度不够，请增加编码长度!");
+                throw new CoreException(CoreErrorCode.THE_ID_LENGTH_IS_NOT_ENOUGH);
             } else {
                 String maxIdStr = get0Str(nextIdValue, numLen);
                 retStr = idPrefix + maxIdStr + idSuffix;
             }
+            return retStr;
         } catch (Exception e) {
             if (logger.isErrorEnabled()) {
-                logger.error("generateNextId - 获取业务流水号[" + idTable + "]出错,Exception = {e}", e);
+                logger.error("generateNextId - 获取业务流水号[" + idTable.getIdCode() + "]出错,Exception: ", e);
+            }
+            if (e instanceof CoreException) {
+                throw new CoreException(((CoreException) e).getCode(), ((CoreException) e).getMessage());
+            } else {
+                throw new CoreException(CoreErrorCode.SERIOUSLY_ERROR);
             }
         }
-        return retStr;
     }
 
 
@@ -190,7 +216,7 @@ public class IdTableUtils {
      *
      * @param nextIdValue 数字
      * @param numLen      位数
-     * @return
+     * @return 补零后的数字字符串
      */
     private static String get0Str(long nextIdValue, int numLen) {
         StringBuilder retStr = new StringBuilder();
