@@ -33,9 +33,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
         excludePath.add("/");
         excludePath.add("/auth/login");
         excludePath.add("/auth/getCode");
+        // 开放远程调用接口
+        excludePath.add("/api/**");
         // 开放前端静态资源和静态页面
         excludePath.add("/static/**");
-        excludePath.add("/api/**");
         excludePath.add("/css/**");
         excludePath.add("/images/**");
         excludePath.add("/js/**");
