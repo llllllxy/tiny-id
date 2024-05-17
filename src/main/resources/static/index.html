@@ -12,7 +12,7 @@
     <meta name="Keywords" content="TINY平台,mock,Mock,在线mock服务,前后端分离,在线mock,在线接口Mock平台,免费mock服务"/>
     <meta name="Description" content="Tiny Mock 是一个可视化, 易操作的能快速生成模拟数据的Mock服务平台"/>
 
-    <title>租户控制台</title>
+    <title>控制台</title>
     <link rel="icon" href="/images/favicon.ico">
     <link rel="stylesheet" href="/lib/layui/css/layui.css?v=2.8.18" media="all">
     <link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css" media="all">
@@ -130,8 +130,6 @@
     </div>
 
 </div>
-<script src="/lib/cipher/sm3.js?v=2.0.0" charset="utf-8"></script>
-<script src="/lib/cipher/sm2.js?v=2.0.0" charset="utf-8"></script>
 <script src="/lib/layui/layui.js?v=2.8.18" charset="utf-8"></script>
 <script src="/js/lay-config.js?v=2.0.0" charset="utf-8"></script>
 <script src="/js/public.js?v=1.0.0" charset="utf-8"></script>
@@ -144,7 +142,7 @@
             miniAdmin = layui.miniAdmin;
 
         var options = {
-            initUrl: "/auth/initMenu",    // 初始化接口
+            initUrl: "/auth/init",    // 初始化接口
             clearUrl: "/cache/clear",   // 缓存清理接口
             renderPageVersion: true,    // 初始化页面是否加版本号
             bgColorDefault: false,      // 主题默认配置
@@ -177,18 +175,18 @@
         });
 
         miniAjax.get({
-            url: "/auth/getTenantInfo",
+            url: "/auth/getUserInfo",
             success: function (res) {
                 if (res.code === 0) {
-                    var username = res.data.tenantName;
-                    var tenantAvatar = res.data.tenantAvatarAddress;
+                    var username = res.data.username;
+                    var avatar = res.data.avatarAddress;
                     if (username) {
                         $('#username').text(username);
                     } else {
                         $('#username').text('null');
                     }
-                    if (tenantAvatar) {
-                        $(".avatar-index").attr('src', tenantAvatar);
+                    if (avatar) {
+                        $(".avatar-index").attr('src', avatar);
                     } else {
                         $(".avatar-index").attr('src', '/images/avatar.gif');
                     }

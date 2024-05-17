@@ -2,7 +2,7 @@ package org.tinycloud.tinyid.constant;
 
 /**
  * <p>
- *  全局常量类
+ * 全局常量类
  * </p>
  *
  * @author liuxingyu01
@@ -31,14 +31,11 @@ public class GlobalConstant {
     public static final Integer DISABLED = 1;
 
     /**
-     * 限流 redis key
-     */
-    public static final String LIMIT_REDIS_KEY = "tinymock:limit:";
-
-    /**
      * session key
      */
     public static final String SESSION_KEY = "loginId";
+
+    public static final String CAPTCHA_CODE_SESSION_KEY = "captchaCode_";
 
     /**
      * 预加载下个号段的百分比

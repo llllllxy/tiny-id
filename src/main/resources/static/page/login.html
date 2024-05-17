@@ -67,28 +67,6 @@
                 </div>
 
                 <div class="layui-form-item">
-                    <div class="layui-row">
-                        <div class="layui-col-xs7">
-                            <div class="layui-input-wrap">
-                                <div class="layui-input-prefix">
-                                    <i class="layui-icon layui-icon-vercode"></i>
-                                </div>
-                                <input type="text" name="captcha" value="" lay-verify="required" placeholder="验证码" lay-reqtext="请填写验证码" autocomplete="off" class="layui-input" lay-affix="clear">
-                            </div>
-                        </div>
-                        <div class="layui-col-xs5">
-                            <div style="margin-left: 10px;" class="captcha-img">
-                                <img id="captcha" lay-on="getCaptcha">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="layui-form-item">
-                    <a href="/page/register.html">注册账号</a>
-                    &nbsp;&nbsp;
-                    <a style="float: right;" href="/page/forget.html">忘记密码？</a>
-                </div>
-                <div class="layui-form-item">
                     <button class="layui-btn layui-btn-fluid" lay-submit lay-filter="login" id="login">登 录</button>
                 </div>
             </form>
@@ -97,15 +75,12 @@
 </div>
 <script src="/lib/jquery/jquery-2.1.4.min.js" charset="utf-8"></script>
 <script src="/lib/jq-module/jquery.particleground.min.js" charset="utf-8"></script>
-<script src="/lib/cipher/sm3.js?v=2.0.0" charset="utf-8"></script>
-<script src="/lib/cipher/sm2.js?v=2.0.0" charset="utf-8"></script>
+<script src="/lib/cipher/sha256.js?v=2.0.0" charset="utf-8"></script>
 <script src="/lib/layui/layui.js?v=2.8.18" charset="utf-8"></script>
 <script src="/js/lay-config.js?v=2.0.0" charset="utf-8"></script>
 <script src="/js/public.js?v=2.0.0" charset="utf-8"></script>
 <script>
     var salt = "W%o$gxG6Nbbg+S4@W5&9VQeud&2O1^V8&We^YwhX-1N+_m7&KQ#JJ@a+UX9Rr5Bk";
-    var verifyKey;
-    var publicKey;
 
     layui.use(['form', 'layer', 'util', 'miniAjax'], function () {
         var $ = layui.jquery,
@@ -125,14 +100,6 @@
             lineColor:'#7ec7fd'
         });
 
-        util.on('lay-on', {
-            getCaptcha: function () {
-                getCaptcha();
-            },
-        });
-
-        getCaptcha();
-
         // 进行登录操作
         form.on('submit(login)', function (data) {
             data = data.field;
@@ -144,13 +111,7 @@
                 layer.msg('密码不能为空');
                 return false;
             }
-            // 先对密码做哈希运算
-            let hashData = sm3(data.password + salt);
-            // 然后再做sm2公钥加密
-            let encryptData = sm2.doEncrypt(hashData, publicKey);
-            // 加密结果
-            data.password = encryptData;
-            data.uuid = verifyKey;
+            data.password = hex_sha256(data.password + salt);
 
             startLoading();
             miniAjax.postJSON({
@@ -158,7 +119,7 @@
                 data: JSON.stringify(data),
                 success: function (res) {
                     stopLoading();
-                    if (res.code == 0) {
+                    if (res.code === 0) {
                         sessionStorage.setItem('token', res.data);
                         sessionStorage.setItem('username', data.username);
                         layer.msg('登录成功，欢迎回来!', {
@@ -168,7 +129,6 @@
                         });
                     } else {
                         layer.msg(res.msg, {time: 1000});
-                        getCaptcha();
                     }
                 },
                 error: function (res) {
@@ -178,25 +138,7 @@
             });
             return false;
         });
-
-
-
-        // 获取图形验证码
-        function getCaptcha() {
-            miniAjax.get({
-                url: "/auth/getCode",
-                success: function (res) {
-                    $("#captcha").prop("src", "data:image/png;base64," + res.data.img);
-                    verifyKey = res.data.uuid;
-                    publicKey = res.data.publicKey;
-                },
-                error: function (error) {
-                    layer.msg(error, {time: 1000, icon: 2});
-                }
-            });
-        }
     });
-
 
     function startLoading() {
         var loginBtn = document.querySelector('#login');

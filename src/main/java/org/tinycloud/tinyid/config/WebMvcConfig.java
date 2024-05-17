@@ -9,6 +9,7 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.tinycloud.tinyid.config.session.AuthenticeInterceptor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -27,7 +28,26 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        List<String> excludePath = new ArrayList<>();
+        // 开放登录接口
+        excludePath.add("/");
+        excludePath.add("/auth/login");
+        excludePath.add("/auth/getCode");
+        // 开放前端静态资源和静态页面
+        excludePath.add("/static/**");
+        excludePath.add("/api/**");
+        excludePath.add("/css/**");
+        excludePath.add("/images/**");
+        excludePath.add("/js/**");
+        excludePath.add("/lib/**");
+        excludePath.add("/page/**");
+        excludePath.add("/index.html");
 
+
+        // 注册会话拦截器
+        registry.addInterceptor(authenticeInterceptor)
+                .addPathPatterns("/**")
+                .excludePathPatterns(excludePath);
     }
 
     /**
