@@ -77,7 +77,7 @@ public class AuthController {
     }
 
     /**
-     * 会话校验
+     * 获取当前会话信息
      */
     @GetMapping("/getUserInfo")
     public ApiResult<UserInfoVo> getUserInfo() {
@@ -85,7 +85,7 @@ public class AuthController {
     }
 
     /**
-     * 会话校验
+     * 菜单初始化
      */
     @GetMapping("/init")
     public ApiResult<?> init() {
@@ -98,49 +98,28 @@ public class AuthController {
         menuItem0.put("target", "_self");
 
         Map<String, String> menuItem1 = new HashMap<>();
-        menuItem1.put("title", "项目管理");
+        menuItem1.put("title", "雪花ID节点");
         menuItem1.put("href", "page/project.html");
         menuItem1.put("icon", "fa fa-navicon");
         menuItem1.put("target", "_self");
 
         Map<String, String> menuItem2 = new HashMap<>();
-        menuItem2.put("title", "主机管理");
+        menuItem2.put("title", "流水号管理");
         menuItem2.put("href", "page/hosts.html");
         menuItem2.put("icon", "fa fa-navicon");
         menuItem2.put("target", "_self");
 
         Map<String, String> menuItem3 = new HashMap<>();
-        menuItem3.put("title", "任务管理");
-        menuItem3.put("href", "page/jobinfo.html");
+        menuItem3.put("title", "使用文档");
+        menuItem3.put("href", "page/doc.html");
         menuItem3.put("icon", "fa fa-navicon");
         menuItem3.put("target", "_self");
-
-        Map<String, String> menuItem4 = new HashMap<>();
-        menuItem4.put("title", "任务日志");
-        menuItem4.put("href", "page/joblog.html");
-        menuItem4.put("icon", "fa fa-navicon");
-        menuItem4.put("target", "_self");
-
-        Map<String, String> menuItem5 = new HashMap<>();
-        menuItem5.put("title", "邮箱配置");
-        menuItem5.put("href", "page/mailconfig.html");
-        menuItem5.put("icon", "fa fa-navicon");
-        menuItem5.put("target", "_self");
-
-        Map<String, String> menuItem6 = new HashMap<>();
-        menuItem6.put("title", "在线CRON");
-        menuItem6.put("href", "page/cron.html");
-        menuItem6.put("icon", "fa fa-navicon");
-        menuItem6.put("target", "_blank");
 
         List<Map<String, String>> menuList = new ArrayList<>();
         menuList.add(menuItem0);
         menuList.add(menuItem1);
         menuList.add(menuItem2);
         menuList.add(menuItem3);
-        menuList.add(menuItem4);
-        menuList.add(menuItem5);
-        menuList.add(menuItem6);
 
         Map<String, String> homeInfo = new HashMap<>();
         homeInfo.put("title", "首页");
