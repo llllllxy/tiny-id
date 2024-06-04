@@ -141,14 +141,14 @@
     });
 
     function startLoading() {
-        var loginBtn = document.querySelector('#login');
+        let loginBtn = document.querySelector('#login');
         loginBtn.classList.add('layui-disabled');
         loginBtn.setAttribute('disabled', true);
         loginBtn.innerHTML = '<span>登录中</span><i class="layui-icon layui-icon-loading layui-anim layui-anim-rotate layui-anim-loop"></i>';
     }
 
     function stopLoading() {
-        var loginBtn = document.querySelector('#login');
+        let loginBtn = document.querySelector('#login');
         loginBtn.classList.remove('layui-disabled');
         loginBtn.removeAttribute('disabled');
         loginBtn.innerHTML = '<span>登 录</span>';
