@@ -18,30 +18,31 @@ import java.util.List;
  * @since 2024-04-27 14:11
  */
 @RestController
+@RequestMapping("/api")
 public class TinyIdController {
 
-    @RequestMapping(value = "/api/snowflake/get", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/snowflake/get", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<Long> getSnowflakeId() {
         return ApiResult.success(SnowflakeSingleton.nextLongId(), "获取成功");
     }
 
-    @RequestMapping(value = "/api/snowflake/batch/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/snowflake/batch/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<List<Long>> getSnowflakeId(@PathVariable("batchSize") Integer batchSize) {
         return ApiResult.success(SnowflakeSingleton.nextBatchLongId(batchSize), "批量获取成功");
     }
 
-    @RequestMapping(value = "/api/segment/get/{idCode}", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/segment/get/{idCode}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<String> getSegment(@PathVariable("idCode") String idCode) {
         return ApiResult.success(IdTableUtils.nextId(idCode), "获取成功");
     }
 
-    @RequestMapping(value = "/api/segment/get/{idCode}/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/segment/get/{idCode}/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<List<String>> getSegment(@PathVariable("idCode") String idCode,
                                               @PathVariable("batchSize") Integer batchSize) {
         return ApiResult.success(IdTableUtils.nextBatchId(idCode, batchSize), "批量获取成功");
     }
 
-    @RequestMapping(value = "/api/test", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/test", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<String> hhh() {
         return ApiResult.success(null, "测试成功");
     }
