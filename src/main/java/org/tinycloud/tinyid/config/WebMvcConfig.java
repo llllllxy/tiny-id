@@ -7,7 +7,7 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import org.tinycloud.tinyid.config.session.AuthenticeInterceptor;
+import org.tinycloud.tinyid.config.session.AuthInterceptor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +24,7 @@ import java.util.Objects;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     @Autowired
-    private AuthenticeInterceptor authenticeInterceptor;
+    private AuthInterceptor authInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -46,7 +46,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
 
         // 注册会话拦截器
-        registry.addInterceptor(authenticeInterceptor)
+        registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/**")
                 .excludePathPatterns(excludePath);
     }

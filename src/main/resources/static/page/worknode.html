@@ -1,0 +1,110 @@
+<div class="layuimini-container layuimini-page-anim">
+    <div class="layuimini-main">
+        <fieldset class="table-search-fieldset">
+            <legend>搜索信息</legend>
+            <div style="margin: 10px 10px 10px 10px">
+                <form class="layui-form" action="" lay-filter="search-form">
+                    <div class="layui-form-item">
+                        <div class="layui-inline">
+                            <label class="layui-form-label">节点IP</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="serverIp" autocomplete="off" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <button type="submit" class="layui-btn" lay-submit lay-filter="data-search-btn">
+                                <i class="layui-icon layui-icon-search"></i>搜 索
+                            </button>
+                            <button type="submit" class="layui-btn layui-btn-primary" lay-submit
+                                    lay-filter="data-reset-btn">
+                                <i class="layui-icon layui-icon-refresh"></i> 重 置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </fieldset>
+        <div class="layuimini-table">
+            <table class="layui-hide" id="worknodeTableId" lay-filter="worknodeTableId"></table>
+        </div>
+    </div>
+</div>
+
+<script>
+    layui.use(['form', 'table', 'miniAjax'], function () {
+        var $ = layui.jquery,
+            form = layui.form,
+            miniAjax = layui.miniAjax,
+            table = layui.table;
+
+        var worknodeTable = table.render({
+            elem: '#worknodeTableId',
+            url: '/worknode/query',
+            method: 'post',
+            contentType: 'application/json',
+            request: {
+                pageName: 'pageNo',
+                limitName: 'pageSize'
+            },
+            parseData: function (res) {
+                return {
+                    "code": res.code,
+                    "msg": res.msg,
+                    "count": res.data.totalCount,
+                    "data": res.data.records
+                };
+            },
+            toolbar: '#toolbarDemo',
+            defaultToolbar: ['filter', 'exports', 'print'],
+            cols: [[
+                {type: 'numbers', width: '10%', title: '序号', align: 'center'},
+                {field: 'serverIp', width: '10%', title: '节点IP', align: 'center'},
+                {field: 'serverPort', width: '10%', title: '节点端口', align: 'center'},
+                {field: 'datacenterId', width: '10%', title: '数据中心ID', align: 'center', templet: function (d) {
+                        return `<span class="layui-badge layui-bg-blue">${d.datacenterId}</span>`;
+                    }
+                },
+                {field: 'workerId', width: '10%', title: '机器ID', align: 'center', templet: function (d) {
+                        return `<span class="layui-badge layui-bg-blue">${d.workerId}</span>`;
+                    }
+                },
+                {field: 'createdAt', width: '20%', title: '创建时间', align: 'center'},
+                {field: 'signedAt', width: '30%', title: '刷新时间', align: 'center'},
+            ]],
+            autoSort: false,
+            limits: [10, 15, 20, 25, 50, 100],
+            limit: 10,
+            page: true,
+            skin: 'line'
+        });
+
+
+        // 监听搜索操作
+        form.on('submit(data-search-btn)', function (data) {
+            // 执行搜索重载
+            table.reloadData('worknodeTableId', {
+                page: {
+                    curr: 1
+                },
+                where: data.field
+            });
+            return false;
+        });
+
+        // 监听重置操作
+        form.on('submit(data-reset-btn)', function (data) {
+            form.val("search-form", {
+                "serverIp": ''
+            });
+            // 执行搜索重载
+            table.reloadData('worknodeTableId', {
+                page: {
+                    curr: 1
+                },
+                where: form.val("search-form")
+            });
+            return false;
+        });
+
+    });
+</script>

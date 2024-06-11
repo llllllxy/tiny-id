@@ -21,21 +21,20 @@ import java.io.IOException;
  * @since 2024-04-09 12:06
  */
 @Component
-public class AuthenticeInterceptor implements HandlerInterceptor {
-    final static Logger logger = LoggerFactory.getLogger(AuthenticeInterceptor.class);
+public class AuthInterceptor implements HandlerInterceptor {
+    final static Logger logger = LoggerFactory.getLogger(AuthInterceptor.class);
 
     /*
      * 进入controller层之前拦截请求
      * 返回值：表示是否将当前的请求拦截下来  false：拦截请求，请求别终止。true：请求不被拦截，继续执行
      * Object obj:表示被拦的请求的目标对象（controller中方法）
      */
-
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
         Object loginId = request.getSession().getAttribute(GlobalConstant.SESSION_KEY);
-        logger.info("AuthenticeInterceptor -- preHandle -- loginId = {}", loginId);
+        logger.info("AuthInterceptor -- preHandle -- loginId = {}", loginId);
         if (loginId == null) {
-            logger.error("AuthenticeInterceptor -- preHandle -- 请求已拦截");
+            logger.error("AuthInterceptor -- preHandle -- 请求已拦截");
             throw new BusinessException(CommonCode.NOT_LOGGED_IN);
         }
         // 合格不需要拦截，放行

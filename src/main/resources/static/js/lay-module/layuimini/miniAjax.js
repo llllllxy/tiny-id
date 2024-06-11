@@ -54,7 +54,7 @@ layui.define(["jquery"], function (exports) {
             // 只有 HTTP 状态码为 200（包括 200-299 范围内）的 Ajax 请求才会触发 success 回调函数
             // 其他状态码将触发 error 回调函数
             success: function (res, textStatus) {
-                if (res.code === 3001 || res.code === '3001') {
+                if (res.code === 401 || res.code === '401') {
                     layer.alert('会话已过期，请重新登录', function (index) {
                         layer.close(index);
                         window.location.href = "/page/login.html";
