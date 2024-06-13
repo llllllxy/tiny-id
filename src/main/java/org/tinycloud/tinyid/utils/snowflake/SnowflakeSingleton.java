@@ -18,12 +18,12 @@ public class SnowflakeSingleton {
 
     public static long datacenterId;
 
-    private static Snowflake snowflakeObj;
+    private static SnowflakeId snowflakeIdObj;
 
     public static void init(long workerId, long datacenterId) {
         SnowflakeSingleton.workerId = workerId;
         SnowflakeSingleton.datacenterId = datacenterId;
-        snowflakeObj = new Snowflake(workerId, datacenterId);
+        snowflakeIdObj = new SnowflakeId(workerId, datacenterId);
     }
 
     /**
@@ -32,7 +32,7 @@ public class SnowflakeSingleton {
      * @return String
      */
     public static String nextId() {
-        return String.valueOf(snowflakeObj.nextId());
+        return String.valueOf(snowflakeIdObj.nextId());
     }
 
     /**
@@ -41,7 +41,7 @@ public class SnowflakeSingleton {
      * @return id
      */
     public static long nextLongId() {
-        return snowflakeObj.nextId();
+        return snowflakeIdObj.nextId();
     }
 
 
@@ -53,7 +53,7 @@ public class SnowflakeSingleton {
     public static List<Long> nextBatchLongId(int batchSize) {
         List<Long> idList = new ArrayList<>();
         for (int i = 0; i < batchSize; i++) {
-            long id = snowflakeObj.nextId();
+            long id = snowflakeIdObj.nextId();
             idList.add(id);
         }
         return idList;
