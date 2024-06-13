@@ -134,4 +134,15 @@ public class WorkNodeDao {
         Long totalSize = jdbcTemplate.queryForObject(sql, Long.class, perimeters.toArray());
         return totalSize;
     }
+
+    /**
+     * 获取总数
+     *
+     * @return 节点总数
+     */
+    public Long totalCount() {
+        String sql = "SELECT count(*) FROM t_worker_node";
+        Long totalSize = jdbcTemplate.queryForObject(sql, Long.class);
+        return totalSize;
+    }
 }

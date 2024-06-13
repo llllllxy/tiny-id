@@ -25,6 +25,12 @@ public class IdTableDao {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /**
+     * 刷新流水号步值
+     *
+     * @param idCode 编码
+     * @return TIdTable
+     */
     @Transactional
     public TIdTable refreshByIdCode(String idCode) {
         // 这条语句自带行锁，相当于 select for update了
@@ -36,12 +42,23 @@ public class IdTableDao {
         return idTable;
     }
 
+    /**
+     * 获取所有流水号信息
+     *
+     * @return TIdTable列表
+     */
     public List<TIdTable> listAll() {
         String sql = "SELECT * FROM t_idtable";
         List<TIdTable> list = this.jdbcTemplate.query(sql, BeanPropertyRowMapper.newInstance(TIdTable.class));
         return list;
     }
 
+    /**
+     * 获取单条流水号信息
+     *
+     * @param idCode 编码
+     * @return TIdTable
+     */
     public TIdTable get(String idCode) {
         String sql = "SELECT * FROM t_idtable WHERE id_code = ?";
         List<TIdTable> list = this.jdbcTemplate.query(sql, BeanPropertyRowMapper.newInstance(TIdTable.class), idCode);
@@ -50,5 +67,27 @@ public class IdTableDao {
         } else {
             return list.get(0);
         }
+    }
+
+    /**
+     * 获取总数
+     *
+     * @return 流水号总数
+     */
+    public Long totalCount() {
+        String sql = "SELECT count(*) FROM t_idtable";
+        Long totalSize = jdbcTemplate.queryForObject(sql, Long.class);
+        return totalSize;
+    }
+
+    /**
+     * 获取id_value最大的前流水号信息
+     *
+     * @return TIdTable列表
+     */
+    public List<TIdTable> listTop25() {
+        String sql = "SELECT * FROM t_idtable ORDER BY id_value DESC LIMIT 25";
+        List<TIdTable> list = this.jdbcTemplate.query(sql, BeanPropertyRowMapper.newInstance(TIdTable.class));
+        return list;
     }
 }
