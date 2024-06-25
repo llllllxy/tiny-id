@@ -50,25 +50,25 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
             throw new IllegalStateException("datacenterId was used up, aborting application startup!");
         }
         this.inetAddress = LocalHostUtils.getInetAddress();
-        String hostName = inetAddress.getHostName();
+        String hostName = this.inetAddress.getHostName();
         String hostAddress = this.inetAddress.getHostAddress();
         logger.info("Initialization snowflake network:" + hostName + "/" + hostAddress);
 
         // 第一步、生成datacenterId
-        long datacenterId = getDatacenterId(32L);
+        long datacenterId = this.getDatacenterId(32L);
         long workerId;
         List<TWorkNode> nodeList = null;
         boolean condition = true;
         while (condition) {
             nodeList = this.workNodeDao.getWorkNodeListByDatacenterId(datacenterId);
             if (nodeList.size() >= 32) {
-                datacenterId = getRandom(32L);
+                datacenterId = this.getRandom(32L);
             } else {
                 List<Long> workerIdList = nodeList.stream().map(TWorkNode::getWorkerId).collect(Collectors.toList());
-                workerId = getRandom(32L);
+                workerId = this.getRandom(32L);
                 if (!workerIdList.contains(workerId)) {
                     try {
-                        // 插入数据库，能插成功就行，
+                        // 第二步,插入数据库，能插成功就行，
                         this.workNodeDao.addWorkNode(hostAddress, environment.getProperty("server.port", Integer.class), workerId, datacenterId);
 
                         // 第三步，加载全局Snowflake对象
@@ -92,10 +92,10 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
     /**
      * 数据标识id部分
      */
-    protected long getDatacenterId(long maxDatacenterId) {
+    private long getDatacenterId(long maxDatacenterId) {
         long id = 0L;
         try {
-            if (null == this.inetAddress) {
+            if (this.inetAddress == null) {
                 this.inetAddress = InetAddress.getLocalHost();
             }
             NetworkInterface network = NetworkInterface.getByInetAddress(this.inetAddress);
@@ -109,7 +109,7 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
                 }
             }
         } catch (Exception e) {
-            logger.warn(" getDatacenterId error: " + e.getMessage());
+            logger.warn(" getDatacenterId error: ", e);
         }
         return id;
     }
@@ -120,7 +120,7 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
      *
      * @return long
      */
-    private static long getRandom(long maxId) {
+    private long getRandom(long maxId) {
         int max = (int) (maxId);
         int min = 0;
         Random random = new Random();

@@ -3,9 +3,6 @@ package org.tinycloud.tinyid.utils.snowflake;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.management.ManagementFactory;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.util.concurrent.ThreadLocalRandom;
 
 
@@ -82,22 +79,6 @@ public class SnowflakeId {
      * 上次生产 ID 时间戳
      */
     private long lastTimestamp = -1L;
-    /*
-     * IP 地址
-     */
-    private InetAddress inetAddress;
-
-    /**
-     * 有参构造器
-     *
-     * @param inetAddress InetAddress对象
-     */
-    public SnowflakeId(InetAddress inetAddress) {
-        this.inetAddress = inetAddress;
-        this.datacenterId = getDatacenterId(MAX_DATACENTER_ID);
-        this.workerId = getWorkerId(datacenterId, MAX_WORKER_ID);
-        this.printLog();
-    }
 
     /**
      * 有参构造器
@@ -115,46 +96,6 @@ public class SnowflakeId {
         this.workerId = workerId;
         this.datacenterId = datacenterId;
         this.printLog();
-    }
-
-    /**
-     * 获取 maxWorkerId
-     */
-    protected long getWorkerId(long datacenterId, long maxWorkerId) {
-        StringBuilder mpId = new StringBuilder();
-        mpId.append(datacenterId);
-        String name = ManagementFactory.getRuntimeMXBean().getName();
-        if (name != null && !name.isEmpty()) {
-            // GET jvmPid
-            mpId.append(name.split("@")[0]);
-        }
-        // MAC + PID 的 hashcode 获取16个低位
-        return (mpId.toString().hashCode() & 0xffff) % (maxWorkerId + 1);
-    }
-
-    /**
-     * 数据标识id部分
-     */
-    protected long getDatacenterId(long maxDatacenterId) {
-        long id = 0L;
-        try {
-            if (null == this.inetAddress) {
-                this.inetAddress = InetAddress.getLocalHost();
-            }
-            NetworkInterface network = NetworkInterface.getByInetAddress(this.inetAddress);
-            if (null == network) {
-                id = 1L;
-            } else {
-                byte[] mac = network.getHardwareAddress();
-                if (null != mac) {
-                    id = ((0x000000FF & (long) mac[mac.length - 2]) | (0x0000FF00 & (((long) mac[mac.length - 1]) << 8))) >> 6;
-                    id = id % (maxDatacenterId + 1);
-                }
-            }
-        } catch (Exception e) {
-            logger.warn("getDatacenterId error: " + e.getMessage());
-        }
-        return id;
     }
 
     /**
