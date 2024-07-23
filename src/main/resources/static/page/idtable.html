@@ -1,0 +1,344 @@
+<style>
+    .special {
+        color: #5E7CE0;
+        text-decoration: underline;
+    }
+    .special:hover {
+        color: #7E96E6
+    }
+</style>
+
+<div class="layuimini-container layuimini-page-anim">
+    <div class="layuimini-main">
+
+        <fieldset class="table-search-fieldset">
+            <legend>搜索信息</legend>
+            <div style="margin: 10px 10px 10px 10px">
+                <form class="layui-form" action="" lay-filter="search-form">
+                    <div class="layui-form-item">
+                        <div class="layui-inline">
+                            <label class="layui-form-label">流水号标识</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="idCode" id="idCode" autocomplete="off" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <label class="layui-form-label">流水号名称</label>
+                            <div class="layui-input-inline">
+                                <input type="text" name="idName" id="idName" autocomplete="off" class="layui-input">
+                            </div>
+                        </div>
+                        <div class="layui-inline">
+                            <button type="submit" class="layui-btn" lay-submit lay-filter="data-search-btn">
+                                <i class="layui-icon layui-icon-search"></i>搜 索
+                            </button>
+                            <button type="submit" class="layui-btn layui-btn-primary" lay-submit
+                                    lay-filter="data-reset-btn">
+                                <i class="layui-icon layui-icon-refresh"></i> 重 置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </fieldset>
+        <div class="layuimini-table">
+            <table class="layui-hide" id="idTableTableId" lay-filter="idTableFilter"></table>
+        </div>
+    </div>
+</div>
+
+<script type="text/html" id="toolbarDemo">
+    <div class="layui-btn-container">
+        <button class="layui-btn layui-btn-sm data-add-btn" lay-event="add">新增</button>
+    </div>
+</script>
+
+<script type="text/html" id="currentTableBar">
+    <a class="layui-btn layui-btn-xs data-count-edit" lay-event="edit">编辑</a>
+    <a class="layui-btn layui-btn-xs layui-btn-danger data-count-delete" lay-event="delete">删除</a>
+</script>
+
+<script type="text/html" id="addDialog">
+    <div class="layuimini-form">
+        <form class="layui-form" action="" lay-filter="add-form" id="add-form">
+            <div class="layui-form-item">
+                <label class="layui-form-label required">原始链接</label>
+                <div class="layui-input-block">
+                    <input type="text" name="originalUrl" lay-verify="required" lay-reqtext="原始链接不能为空"
+                           placeholder="请输入原始链接" value="" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">过期时间</label>
+                <div class="layui-input-block">
+                    <input type="text" name="expireDate" lay-verify="required" lay-reqtext="过期时间不能为空" autocomplete="off"
+                           placeholder="yyyy-MM-dd" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">状态</label>
+                <div class="layui-input-block">
+                    <select name="status" lay-filter="status" lay-verify="required" lay-reqtext="状态不能为空">
+                        <option value="0">启用</option>
+                        <option value="1">停用</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="layui-form-item layui-form-text">
+                <label class="layui-form-label">备注信息</label>
+                <div class="layui-input-block">
+                    <textarea name="remark" class="layui-textarea" placeholder="请输入备注信息"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item text-right">
+                <button class="layui-btn" lay-submit lay-filter="addSaveBtn">保存</button>
+                <button class="layui-btn layui-btn-primary" type="button" lay-filter="closeAddDialog">取消</button>
+            </div>
+        </form>
+    </div>
+</script>
+
+<script type="text/html" id="editDialog">
+    <div class="layuimini-form">
+        <form class="layui-form" action="" lay-filter="edit-form" id="edit-form">
+            <div class="layui-form-item">
+                <label class="layui-form-label required">短链ID</label>
+                <div class="layui-input-block">
+                    <div class="layui-form-mid" name="id" style="word-break: break-all"></div>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">过期时间</label>
+                <div class="layui-input-block">
+                    <input type="text" name="expireDate" lay-verify="required" lay-reqtext="过期时间不能为空" autocomplete="off"
+                           placeholder="yyyy-MM-dd" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item text-right">
+                <button class="layui-btn" lay-submit lay-filter="editSaveBtn">保存</button>
+                <button class="layui-btn layui-btn-primary" type="button" lay-filter="closeEditDialog">取消</button>
+            </div>
+        </form>
+    </div>
+</script>
+
+
+<script>
+    layui.use(['form', 'table', 'miniAjax'], function () {
+        var $ = layui.jquery,
+            form = layui.form,
+            miniAjax = layui.miniAjax,
+            table = layui.table;
+
+        var currTable = table.render({
+            elem: '#idTableTableId',
+            url: '/idtable/query',
+            method: 'post',
+            contentType: 'application/json',
+            request: {
+                pageName: 'pageNo',
+                limitName: 'pageSize'
+            },
+            parseData: function (res) {
+                return {
+                    "code": res.code,
+                    "msg": res.msg,
+                    "count": res.data.totalCount,
+                    "data": res.data.records
+                };
+            },
+            toolbar: '#toolbarDemo',
+            defaultToolbar: ['filter', 'exports', 'print'],
+            cols: [[
+                {field: 'id', width: '6%', title: 'ID', sort: true, align: 'center', fixed: 'left'},
+                {
+                    field: 'idCode', width: '10%', title: '标识', templet: function (d) {
+                        return `<a class="special" href="javascript:;" lay-event="copy" onmouseover="showTip(this)" onmouseleave="closeTip(this)">${d.idCode}</a>`
+                    }
+                },
+                {field: 'idName', width: '10%', title: '名称'},
+                {field: 'idValue', width: '10%', title: '当前值', align: 'center'},
+                {field: 'idLength', width: '10%', title: '长度'},
+                {field: 'idStep', width: '10%', title: '步长' },
+                {field: 'idPrefix', width: '10%', title: '前缀'},
+                {field: 'idSuffix', width: '10%', title: '后缀'},
+                {field: 'createdAt', width: '10%', title: '创建时间'},
+                {title: '操作', width: '14%', toolbar: '#currentTableBar', align: "center"}
+            ]],
+            autoSort: false,
+            limits: [10, 15, 20, 25, 50, 100],
+            limit: 10,
+            page: true,
+            skin: 'line'
+        });
+
+        // 监听搜索操作
+        form.on('submit(data-search-btn)', function (data) {
+            // 执行搜索重载
+            table.reload('idTableTableId', {
+                page: {
+                    curr: 1
+                },
+                where: data.field
+            });
+            return false;
+        });
+
+        // 监听重置操作
+        form.on('submit(data-reset-btn)', function (data) {
+            form.val("search-form", {
+                "idCode": '',
+                "idName": ''
+            });
+            // 执行搜索重载
+            currTable.reload({
+                page: {
+                    curr: 1
+                },
+                where: form.val("search-form")
+            });
+            return false;
+        });
+
+        /**
+         * toolbar事件监听
+         */
+        table.on('toolbar(idTableFilter)', function (obj) {
+            if (obj.event === 'add') { // 监听添加操作
+                var index = layer.open({
+                    title: '新增流水号',
+                    type: 1,
+                    shade: 0.2,
+                    maxmin: true,
+                    shadeClose: false,
+                    area: '580px', // 宽度580, 高度自适应
+                    content: $('#addDialog').html(),
+                    success: function (layero, dIndex) {
+                        form.render(null, 'add-form');
+                        // 表单提交事件
+                        form.on('submit(addSaveBtn)', function (data) {
+                            miniAjax.postJSON({
+                                url: '/idtable/add',
+                                data: JSON.stringify(data.field),
+                                success: function (res) {
+                                    if (res.code == '0') {
+                                        layer.msg(res.msg, {time: 1000, icon: 1}, function () {
+                                            layer.close(dIndex);
+                                        });
+                                    } else {
+                                        layer.msg(res.msg, {time: 1000, icon: 2});
+                                    }
+                                }
+                            });
+                            return false;
+                        });
+
+                        // 监听取消按钮
+                        $("button[lay-filter='closeAddDialog']").click(function () {
+                            layer.close(dIndex);
+                            return false;
+                        });
+                    },
+                    end: function (index) {
+                        // 重载表格，刷新数据
+                        currTable.reload();
+                    }
+                });
+            }
+        });
+
+        table.on('tool(idTableFilter)', function (obj) {
+            var lineData = obj.data;
+            if (obj.event === 'edit') {
+                var index = layer.open({
+                    title: '编辑流水号',
+                    type: 1,
+                    shade: 0.2,
+                    maxmin: true,
+                    shadeClose: false,
+                    area: '580px', // 宽度580, 高度自适应
+                    content: $('#editDialog').html(),
+                    success: function (layero, dIndex) {
+                        layero.find("[name='idCode']").text(lineData.idCode);
+                        form.render(null, 'edit-form');
+                        // 表单提交事件
+                        form.on('submit(editSaveBtn)', function (data) {
+                            data.field.id = lineData.id;
+                            miniAjax.postJSON({
+                                url: '/idtable/edit',
+                                data: JSON.stringify(data.field),
+                                success: function (res) {
+                                    if (res.code == '0') {
+                                        layer.msg(res.msg, {time: 1000, icon: 1}, function () {
+                                            layer.close(dIndex);
+                                        });
+                                    } else {
+                                        layer.msg(res.msg, {time: 1000, icon: 2});
+                                    }
+                                }
+                            });
+                            return false;
+                        });
+
+                        // 监听取消按钮
+                        $("button[lay-filter='closeEditDialog']").click(function () {
+                            layer.close(dIndex);
+                            return false;
+                        });
+                    },
+                    end: function (index) {
+                        // 重载表格，刷新数据
+                        currTable.reload();
+                    }
+                });
+                return false;
+            } else if (obj.event === 'delete') {
+                layer.confirm('确定删除此流水号吗', function (index) {
+                    layer.close(index);
+                    miniAjax.get({
+                        url: '/idtable/del?id=' + lineData.id,
+                        success: function (res) {
+                            if (res.code == '0') {
+                                layer.msg(res.msg, {time: 1000, icon: 1}, function () {
+                                    // 重载表格，刷新数据
+                                    currTable.reload();
+                                });
+                            } else {
+                                layer.msg(res.msg, {time: 1000, icon: 2});
+                            }
+                        }
+                    });
+                });
+            } else if (obj.event === 'copy') {
+                handleClipboard(lineData.idCode)
+            }
+        });
+
+
+        function handleClipboard(text) {
+            const oInput = document.createElement('input');
+            oInput.value = text;
+            document.body.appendChild(oInput);
+            oInput.select(); // 选择对象
+            document.execCommand("Copy"); // 执行浏览器复制命令
+            oInput.className = 'oInput';// 设置class名
+            document.getElementsByClassName("oInput")[0].remove();// 移除这个input
+            layer.msg('已复制到粘贴板');
+        }
+
+        var layerTipIndex
+        window.showTip = function(t) {
+            var row = '点击复制链接';
+            //小tips
+            layerTipIndex = layer.tips(row,t,{
+                tips:[1,'#5E7CE0'],
+                time:4000
+            })
+        }
+
+        window.closeTip = function (t) {
+            layer.close(layerTipIndex);
+        }
+    });
+</script>

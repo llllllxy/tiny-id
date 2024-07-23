@@ -7,8 +7,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
+import org.tinycloud.tinyid.bean.dto.IdTableQueryDto;
 import org.tinycloud.tinyid.bean.entity.TIdTable;
+import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
 
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -90,4 +95,67 @@ public class IdTableDao {
         List<TIdTable> list = this.jdbcTemplate.query(sql, BeanPropertyRowMapper.newInstance(TIdTable.class));
         return list;
     }
+
+
+
+    /**
+     * 分页查询list
+     *
+     * @param dto IdTableQueryDto
+     * @return 流水号列表
+     */
+    public List<TIdTable> pageList(IdTableQueryDto dto) {
+        List<Object> perimeters = new ArrayList<>();
+        String sql = "SELECT * FROM t_idtable WHERE 1=1 ";
+        if (StringUtils.hasText(dto.getIdCode())) {
+            sql = sql + "AND id_code LIKE CONCAT('%', ? ,'%')";
+            perimeters.add(dto.getIdCode());
+        }
+        if (StringUtils.hasText(dto.getIdName())) {
+            sql = sql + "AND id_name LIKE CONCAT('%', ? ,'%')";
+            perimeters.add(dto.getIdName());
+        }
+        int offset = (dto.getPageNo() - 1) * dto.getPageSize();
+        int limit = dto.getPageSize();
+        sql = sql + "LIMIT ?,?";
+        perimeters.add(offset);
+        perimeters.add(limit);
+
+        List<TIdTable> nodeList = this.jdbcTemplate.query(sql, BeanPropertyRowMapper.newInstance(TIdTable.class), perimeters.toArray());
+        return nodeList;
+    }
+
+    /**
+     * 分页查询count
+     *
+     * @param dto IdTableQueryDto
+     * @return 流水号总条数
+     */
+    public Long pageCount(IdTableQueryDto dto) {
+        List<Object> perimeters = new ArrayList<>();
+        String sql = "SELECT count(*) FROM t_idtable WHERE 1=1 ";
+        if (StringUtils.hasText(dto.getIdCode())) {
+            sql = sql + "AND id_code LIKE CONCAT('%', ? ,'%')";
+            perimeters.add(dto.getIdCode());
+        }
+        if (StringUtils.hasText(dto.getIdName())) {
+            sql = sql + "AND id_name LIKE CONCAT('%', ? ,'%')";
+            perimeters.add(dto.getIdName());
+        }
+        Long totalSize = jdbcTemplate.queryForObject(sql, Long.class, perimeters.toArray());
+        return totalSize;
+    }
+
+    /**
+     * 删除流水号
+     * @param id 流水号主键
+     * @return 删除结果
+     */
+    public boolean delete(Long id) {
+        String sql = "DELETE FROM t_idtable WHERE id = ?";
+        int num = this.jdbcTemplate.update(sql, id);
+        return num > 0;
+    }
+
+
 }

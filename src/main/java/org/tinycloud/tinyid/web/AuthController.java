@@ -105,7 +105,7 @@ public class AuthController {
 
         Map<String, String> menuItem2 = new HashMap<>();
         menuItem2.put("title", "流水号管理");
-        menuItem2.put("href", "page/segmentid.html");
+        menuItem2.put("href", "page/idtable.html");
         menuItem2.put("icon", "fa fa-navicon");
         menuItem2.put("target", "_self");
 
