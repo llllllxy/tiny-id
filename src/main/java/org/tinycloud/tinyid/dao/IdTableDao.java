@@ -8,12 +8,13 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import org.tinycloud.tinyid.bean.dto.IdTableAddDto;
+import org.tinycloud.tinyid.bean.dto.IdTableEditDto;
 import org.tinycloud.tinyid.bean.dto.IdTableQueryDto;
 import org.tinycloud.tinyid.bean.entity.TIdTable;
-import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
+import org.tinycloud.tinyid.utils.AuthUtils;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -97,7 +98,6 @@ public class IdTableDao {
     }
 
 
-
     /**
      * 分页查询list
      *
@@ -148,6 +148,7 @@ public class IdTableDao {
 
     /**
      * 删除流水号
+     *
      * @param id 流水号主键
      * @return 删除结果
      */
@@ -157,5 +158,31 @@ public class IdTableDao {
         return num > 0;
     }
 
+    /**
+     * 新增流水号
+     *
+     * @param dto 数据
+     * @return 新增结果
+     */
+    public boolean add(IdTableAddDto dto) {
+        String sql = "INSERT INTO t_idtable (id_code, id_name, id_step, id_length, has_prefix, id_prefix, has_suffix, id_suffix, remark, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)";
+        int num = this.jdbcTemplate.update(sql, dto.getIdCode(), dto.getIdName(), dto.getIdStep(),
+                dto.getIdLength(), dto.getHasPrefix(), dto.getIdPrefix(), dto.getHasSuffix(), dto.getIdSuffix(),
+                dto.getRemark(), (String) AuthUtils.getLoginId());
+        return num > 0;
+    }
 
+    /**
+     * 修改流水号
+     *
+     * @param dto 数据
+     * @return 修改结果
+     */
+    public boolean edit(IdTableEditDto dto) {
+        String sql = "UPDATE t_idtable SET id_name = ?, id_step = ?, id_length = ?, has_prefix = ?, id_prefix = ?, has_suffix = ?, id_suffix = ?, remark = ?, created_by = ? WHERE id = ?";
+        int num = this.jdbcTemplate.update(sql, dto.getIdName(), dto.getIdStep(), dto.getIdLength(),
+                dto.getHasPrefix(), dto.getIdPrefix(), dto.getHasSuffix(), dto.getIdSuffix(),
+                dto.getRemark(), (String) AuthUtils.getLoginId(), dto.getId());
+        return num > 0;
+    }
 }

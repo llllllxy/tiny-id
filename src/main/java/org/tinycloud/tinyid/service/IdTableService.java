@@ -4,6 +4,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.tinycloud.tinyid.bean.dto.IdTableAddDto;
+import org.tinycloud.tinyid.bean.dto.IdTableEditDto;
 import org.tinycloud.tinyid.bean.dto.IdTableQueryDto;
 import org.tinycloud.tinyid.bean.entity.TIdTable;
 import org.tinycloud.tinyid.bean.vo.IdTableVo;
@@ -43,5 +45,14 @@ public class IdTableService {
 
     public boolean delete(Long id) {
         return this.idTableDao.delete(id);
+    }
+
+    public boolean add(IdTableAddDto dto) {
+        return this.idTableDao.add(dto);
+    }
+
+
+    public boolean edit(IdTableEditDto dto) {
+        return this.idTableDao.edit(dto);
     }
 } 

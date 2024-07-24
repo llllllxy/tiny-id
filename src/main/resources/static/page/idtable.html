@@ -62,26 +62,62 @@
     <div class="layuimini-form">
         <form class="layui-form" action="" lay-filter="add-form" id="add-form">
             <div class="layui-form-item">
-                <label class="layui-form-label required">原始链接</label>
+                <label class="layui-form-label required">标识编码</label>
                 <div class="layui-input-block">
-                    <input type="text" name="originalUrl" lay-verify="required" lay-reqtext="原始链接不能为空"
-                           placeholder="请输入原始链接" value="" class="layui-input">
+                    <input type="text" name="idCode" lay-verify="required" lay-reqtext="流水号标识编码不能为空"
+                           placeholder="请输入流水号标识编码" value="" class="layui-input">
                 </div>
             </div>
             <div class="layui-form-item">
-                <label class="layui-form-label">过期时间</label>
+                <label class="layui-form-label required">名称</label>
                 <div class="layui-input-block">
-                    <input type="text" name="expireDate" lay-verify="required" lay-reqtext="过期时间不能为空" autocomplete="off"
-                           placeholder="yyyy-MM-dd" class="layui-input">
+                    <input type="text" name="idName" lay-verify="required" lay-reqtext="流水号名称不能为空"
+                           placeholder="请输入流水号名称" value="" class="layui-input">
                 </div>
             </div>
             <div class="layui-form-item">
-                <label class="layui-form-label">状态</label>
+                <label class="layui-form-label">步长</label>
                 <div class="layui-input-block">
-                    <select name="status" lay-filter="status" lay-verify="required" lay-reqtext="状态不能为空">
-                        <option value="0">启用</option>
-                        <option value="1">停用</option>
-                    </select>
+                    <input type="number" name="idStep" lay-verify="required" lay-reqtext="流水号步长不能为空" value="100" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">长度</label>
+                <div class="layui-input-block">
+                    <input type="number" name="idLength" lay-verify="required" lay-reqtext="流水号长度不能为空" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+
+            <div class="layui-form-item label-wide">
+                <label class="layui-form-label required">是否有前缀</label>
+                <div class="layui-input-block">
+                    <input type="radio" name="hasPrefix" lay-filter="hasPrefix" value="1" title="是">
+                    <input type="radio" name="hasPrefix" lay-filter="hasPrefix" value="0" title="否" checked>
+                </div>
+            </div>
+            <div class="layui-form-item layui-hide" id="idPrefixDiv">
+                <label class="layui-form-label">前缀</label>
+                <div class="layui-input-group">
+                    <input type="text" name="idPrefix" placeholder="请输入流水号前缀" value="" class="layui-input">
+                    <div class="layui-input-suffix">
+                        <i class="layui-icon layui-icon-tips" id="idPrefixIcon"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-form-item label-wide">
+                <label class="layui-form-label required">是否有后缀</label>
+                <div class="layui-input-block">
+                    <input type="radio" name="hasSuffix" lay-filter="hasSuffix" value="1" title="是">
+                    <input type="radio" name="hasSuffix" lay-filter="hasSuffix" value="0" title="否" checked>
+                </div>
+            </div>
+            <div class="layui-form-item layui-hide" id="idSuffixDiv">
+                <label class="layui-form-label">后缀</label>
+                <div class="layui-input-group">
+                    <input type="text" name="idSuffix" placeholder="请输入流水号后缀" value="" class="layui-input">
+                    <div class="layui-input-suffix">
+                        <i class="layui-icon layui-icon-tips" id="idSuffixIcon"></i>
+                    </div>
                 </div>
             </div>
 
@@ -103,16 +139,67 @@
     <div class="layuimini-form">
         <form class="layui-form" action="" lay-filter="edit-form" id="edit-form">
             <div class="layui-form-item">
-                <label class="layui-form-label required">短链ID</label>
+                <label class="layui-form-label required">标识编码</label>
                 <div class="layui-input-block">
-                    <div class="layui-form-mid" name="id" style="word-break: break-all"></div>
+                    <div class="layui-form-mid" name="idCode" style="word-break: break-all"></div>
                 </div>
             </div>
             <div class="layui-form-item">
-                <label class="layui-form-label">过期时间</label>
+                <label class="layui-form-label required">名称</label>
                 <div class="layui-input-block">
-                    <input type="text" name="expireDate" lay-verify="required" lay-reqtext="过期时间不能为空" autocomplete="off"
-                           placeholder="yyyy-MM-dd" class="layui-input">
+                    <input type="text" name="idName" lay-verify="required" lay-reqtext="流水号名称不能为空"
+                           placeholder="请输入流水号名称" value="" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">步长</label>
+                <div class="layui-input-block">
+                    <input type="number" name="idStep" lay-verify="required" lay-reqtext="流水号步长不能为空" value="100" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">长度</label>
+                <div class="layui-input-block">
+                    <input type="number" name="idLength" lay-verify="required" lay-reqtext="流水号长度不能为空" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item label-wide">
+                <label class="layui-form-label required">是否有前缀</label>
+                <div class="layui-input-block">
+                    <input type="radio" name="hasPrefix" lay-filter="hasPrefix" value="1" title="是">
+                    <input type="radio" name="hasPrefix" lay-filter="hasPrefix" value="0" title="否" checked>
+                </div>
+            </div>
+            <div class="layui-form-item layui-hide" id="idPrefixDiv">
+                <label class="layui-form-label">前缀</label>
+                <div class="layui-input-group">
+                    <input type="text" name="idPrefix" placeholder="请输入流水号前缀" value="" class="layui-input">
+                    <div class="layui-input-suffix">
+                        <i class="layui-icon layui-icon-tips" id="idPrefixIcon"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-form-item label-wide">
+                <label class="layui-form-label required">是否有后缀</label>
+                <div class="layui-input-block">
+                    <input type="radio" name="hasSuffix" lay-filter="hasSuffix" value="1" title="是">
+                    <input type="radio" name="hasSuffix" lay-filter="hasSuffix" value="0" title="否" checked>
+                </div>
+            </div>
+            <div class="layui-form-item layui-hide" id="idSuffixDiv">
+                <label class="layui-form-label">后缀</label>
+                <div class="layui-input-group">
+                    <input type="text" name="idSuffix" placeholder="请输入流水号后缀" value="" class="layui-input">
+                    <div class="layui-input-suffix">
+                        <i class="layui-icon layui-icon-tips" id="idSuffixIcon"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layui-form-item layui-form-text">
+                <label class="layui-form-label">备注信息</label>
+                <div class="layui-input-block">
+                    <textarea name="remark" class="layui-textarea" placeholder="请输入备注信息"></textarea>
                 </div>
             </div>
             <div class="layui-form-item text-right">
@@ -128,8 +215,20 @@
     layui.use(['form', 'table', 'miniAjax'], function () {
         var $ = layui.jquery,
             form = layui.form,
+            layer = layui.layer,
             miniAjax = layui.miniAjax,
             table = layui.table;
+
+
+        var tipStr = "<p>假设当前时间为2024年2月25日3时11分23秒，如果前缀或后缀包含下列字符串</p>" +
+            "<p>yyyy：生成的流水号将该字符串替换为2024</p>" +
+            "<p>yy：生成的流水号将该字符串替换为19</p>" +
+            "<p>MM：生成的流水号将该字符串替换为02</p>" +
+            "<p>dd：生成的流水号将该字符串替换为25</p>" +
+            "<p>HH：生成的流水号将该字符串替换为03</p>" +
+            "<p>mm：生成的流水号将该字符串替换为11</p>" +
+            "<p>ss：生成的流水号将该字符串替换为23</p>" +
+            "<p>以上日期时间字符，yyyyMMddHHmmss，区分大小写</p>";
 
         var currTable = table.render({
             elem: '#idTableTableId',
@@ -216,6 +315,46 @@
                     content: $('#addDialog').html(),
                     success: function (layero, dIndex) {
                         form.render(null, 'add-form');
+
+                        var tipsIndex1;
+                        layero.find("#idPrefixIcon").on("mouseover", function() {
+                            tipsIndex1 = layer.tips(tipStr, "#idPrefixIcon", {tips: [2, '#4BB2FF'], time: 50000});
+                        }).on("mouseout", function() {
+                            layer.close(tipsIndex1);
+                        });
+
+                        var tipsIndex2;
+                        layero.find("#idSuffixIcon").on("mouseover", function() {
+                            tipsIndex2 = layer.tips(tipStr, "#idSuffixIcon", {tips: [2, '#4BB2FF'], time: 50000});
+                        }).on("mouseout", function() {
+                            layer.close(tipsIndex2);
+                        });
+
+
+                        // 监听layer里面的单选框，哦耶
+                        form.on('radio(hasPrefix)', function (data) {
+                            // 改变时先清空原来的值
+                            form.val('add-form', {"idPrefix": ""});
+                            var value = data.elem.value; // 获得 radio 值
+                            if (value == "1") {
+                                layero.find("#idPrefixDiv").removeClass("layui-hide");
+                            } else {
+                                layero.find("#idPrefixDiv").addClass("layui-hide");
+                            }
+                        });
+
+                        // 监听layer里面的单选框，哦耶
+                        form.on('radio(hasSuffix)', function (data) {
+                            // 改变时先清空原来的值
+                            form.val('add-form', {"idSuffix": ""});
+                            var value = data.elem.value; // 获得 radio 值
+                            if (value == "1") {
+                                layero.find("#idSuffixDiv").removeClass("layui-hide");
+                            } else {
+                                layero.find("#idSuffixDiv").addClass("layui-hide");
+                            }
+                        });
+
                         // 表单提交事件
                         form.on('submit(addSaveBtn)', function (data) {
                             miniAjax.postJSON({
@@ -262,6 +401,56 @@
                     success: function (layero, dIndex) {
                         layero.find("[name='idCode']").text(lineData.idCode);
                         form.render(null, 'edit-form');
+                        // 回显表单数据
+                        form.val('edit-form', lineData);
+
+                        // 回显特殊选项
+                        if (lineData.hasPrefix == '1') {
+                            layero.find("#idPrefixDiv").removeClass("layui-hide");
+                        }
+                        if (lineData.hasSuffix == '1') {
+                            layero.find("#idSuffixDiv").removeClass("layui-hide");
+                        }
+
+                        var tipsIndex3;
+                        layero.find("#idPrefixIcon").on("mouseover", function() {
+                            tipsIndex3 = layer.tips(tipStr, "#idPrefixIcon", {tips: [2, '#4BB2FF'], time: 50000});
+                        }).on("mouseout", function() {
+                            layer.close(tipsIndex3);
+                        });
+
+                        var tipsIndex4;
+                        layero.find("#idSuffixIcon").on("mouseover", function() {
+                            tipsIndex4 = layer.tips(tipStr, "#idSuffixIcon", {tips: [2, '#4BB2FF'], time: 50000});
+                        }).on("mouseout", function() {
+                            layer.close(tipsIndex4);
+                        });
+
+                        // 监听layer里面的单选框，哦耶
+                        form.on('radio(hasPrefix)', function (data) {
+                            // 改变时先清空原来的值
+                            form.val('edit-form', {"idPrefix": ""});
+                            var value = data.elem.value; // 获得 radio 值
+                            if (value == "1") {
+                                layero.find("#idPrefixDiv").removeClass("layui-hide");
+                            } else {
+                                layero.find("#idPrefixDiv").addClass("layui-hide");
+                            }
+                        });
+
+                        // 监听layer里面的单选框，哦耶
+                        form.on('radio(hasSuffix)', function (data) {
+                            // 改变时先清空原来的值
+                            form.val('edit-form', {"idSuffix": ""});
+                            var value = data.elem.value; // 获得 radio 值
+                            if (value == "1") {
+                                layero.find("#idSuffixDiv").removeClass("layui-hide");
+                            } else {
+                                layero.find("#idSuffixDiv").addClass("layui-hide");
+                            }
+                        });
+
+
                         // 表单提交事件
                         form.on('submit(editSaveBtn)', function (data) {
                             data.field.id = lineData.id;
