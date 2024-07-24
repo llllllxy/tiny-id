@@ -36,7 +36,7 @@ public class TinyIdController {
         return ApiResult.success(IdTableUtils.nextId(idCode), "获取成功");
     }
 
-    @RequestMapping(value = "/segment/get/{idCode}/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/segment/batch/{idCode}/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<List<String>> getSegment(@PathVariable("idCode") String idCode,
                                               @PathVariable("batchSize") Integer batchSize) {
         return ApiResult.success(IdTableUtils.nextBatchId(idCode, batchSize), "批量获取成功");
