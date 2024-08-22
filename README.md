@@ -51,7 +51,7 @@ Tiny ID 是一个基于SpringBoot+MySQL的轻量级、灵活、高性能的分�
 ## 主要技术选型
 
 1、后端：
-- SpringBoot 3.1.9
+- SpringBoot 3.1.12
 
 2、前端：
 - Layui 2.8.11
