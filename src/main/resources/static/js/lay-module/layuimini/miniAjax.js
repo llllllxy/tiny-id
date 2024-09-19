@@ -105,7 +105,7 @@ layui.define(["jquery"], function (exports) {
             options.type = 'GET';
             options.timeout = options.timeout || 20000; // 设置本地的请求超时时间（以毫秒计）
             options.async = options.async !== false; // 布尔值，表示请求是否异步处理。默认是 true
-            options.cache = options.cache !== true; // 布尔值，表示浏览器是否缓存被请求页面，默认是false
+            options.cache = options.cache === true; // 布尔值，表示浏览器是否缓存被请求页面，默认是false
             options.dataType = options.dataType || 'json';
             $.ajax({
                 url: options.url,
@@ -137,7 +137,7 @@ layui.define(["jquery"], function (exports) {
             options.type = 'POST';
             options.timeout = options.timeout || 20000;
             options.async = options.async !== false;
-            options.cache = options.cache !== true;
+            options.cache = options.cache === true;
             options.dataType = options.dataType || 'json';
             options.contentType = options.contentType || 'application/x-www-form-urlencoded';
             options.data = options.data || {};
@@ -173,7 +173,7 @@ layui.define(["jquery"], function (exports) {
             options.type = 'POST';
             options.timeout = options.timeout || 20000;
             options.async = options.async !== false;
-            options.cache = options.cache !== true;
+            options.cache = options.cache === true;
             options.dataType = options.dataType || 'json';
             options.contentType = options.contentType || 'application/json';
             options.data = options.data || '';
@@ -208,7 +208,7 @@ layui.define(["jquery"], function (exports) {
             options.type = 'POST';
             options.timeout = options.timeout || 20000;
             options.async = options.async !== false;
-            options.cache = options.cache !== true;
+            options.cache = options.cache === true;
             options.dataType = options.dataType || 'json';
             options.contentType = options.contentType || false;
             options.processData = options.processData || false;
