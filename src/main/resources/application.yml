@@ -1,0 +1,63 @@
+tinyid:
+  name: tiny-id
+  version: 1.0.0
+  db-type: mysql
+server:
+  port: 9999
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+      enabled: true
+  tomcat:
+    threads:
+      max: 800
+      min-spare: 100
+    accept-count: 1000
+    max-connections: 10000
+spring:
+  application:
+    name: tiny-id
+  mvc:
+    throw-exception-if-no-handler-found: 'true'
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 200MB
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+  web:
+    resources:
+      add-mappings: false
+  session:
+    timeout: 1800s
+    jdbc:
+      table-name: SPRING_SESSION
+      cleanup-cron: 0 0/5 * * * ?
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:mysql://127.0.0.1:3306/tiny-id?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&zeroDateTimeBehavior=convertToNull&useSSL=true&allowMultiQueries=true
+    driverClassName: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 123654
+    hikari:
+      minimum-idle: 10
+      maximum-pool-size: 15
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+logging:
+  level:
+    org.tinycloud.tinyid: info
+    org.springframework: warn
+async:
+  executor:
+    thread:
+      core-pool-size: 5
+      keep-alive-seconds: 60
+      max-pool-size: 20
+      name-prefix: async-service-
+      queue-capacity: 200
