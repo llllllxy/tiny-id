@@ -19,7 +19,7 @@ spring:
   application:
     name: tiny-id
   mvc:
-    throw-exception-if-no-handler-found: 'true'
+    throw-exception-if-no-handler-found: true
   servlet:
     multipart:
       enabled: true
