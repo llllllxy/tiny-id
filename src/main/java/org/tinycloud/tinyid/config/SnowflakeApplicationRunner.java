@@ -17,12 +17,12 @@ import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
  * <p>
- * 雪花id启动时注册类
+ *  雪花id启动时执行类，自动生成未被使用的datacenterId和workerId
  * </p>
  *
  * @author liuxingyu01
@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 @Order(98)
 public class SnowflakeApplicationRunner implements ApplicationRunner {
     private static final Logger logger = LoggerFactory.getLogger(SnowflakeApplicationRunner.class);
-
 
     private InetAddress inetAddress;
 
@@ -46,7 +45,7 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) throws Exception {
         logger.info("Initialization snowflake start!");
         Long count = this.workNodeDao.getDistinctDatacenterIds();
-        if (count >= 32 * 32) {
+        if (count >= 32L * 32L) {
             throw new IllegalStateException("datacenterId was used up, aborting application startup!");
         }
         this.inetAddress = LocalHostUtils.getInetAddress();
@@ -54,24 +53,24 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
         String hostAddress = this.inetAddress.getHostAddress();
         logger.info("Initialization snowflake network:" + hostName + "/" + hostAddress);
 
-        // 第一步、生成datacenterId
-        long datacenterId = this.getDatacenterId(32L);
+        // 第一步、首次先根据网卡信息生成datacenterId
+        long datacenterId = this.getDatacenterId(31L);
         long workerId;
         List<TWorkNode> nodeList = null;
         boolean condition = true;
         while (condition) {
             nodeList = this.workNodeDao.getWorkNodeListByDatacenterId(datacenterId);
-            if (nodeList.size() >= 32) {
-                datacenterId = this.getRandom(32L);
+            if (nodeList.size() >= 32) { // 表示此数据中心下机器号已用完，则重新随机数据中心ID
+                datacenterId = getRandomId();
             } else {
                 List<Long> workerIdList = nodeList.stream().map(TWorkNode::getWorkerId).collect(Collectors.toList());
-                workerId = this.getRandom(32L);
+                workerId = getRandomId();
                 if (!workerIdList.contains(workerId)) {
                     try {
-                        // 第二步,插入数据库，能插成功就行，
+                        // 第二步、插入数据库，能插成功就行，
                         this.workNodeDao.addWorkNode(hostAddress, environment.getProperty("server.port", Integer.class), workerId, datacenterId);
 
-                        // 第三步，加载全局Snowflake对象
+                        // 第三步、加载全局Snowflake对象
                         SnowflakeSingleton.init(workerId, datacenterId);
                         condition = false;
                     } catch (Exception e) {
@@ -115,15 +114,13 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
     }
 
     /**
-     * 如输入32
-     * 则生成0-31之间的随机数
+     * 生成0-31之间的随机数，作为workerId或者datacenterId
      *
      * @return long
      */
-    private long getRandom(long maxId) {
-        int max = (int) (maxId);
+    private static long getRandomId() {
+        int max = 31;
         int min = 0;
-        Random random = new Random();
-        return random.nextInt(max - min) + min;
+        return ThreadLocalRandom.current().nextInt(min, max + 1);
     }
 }

@@ -77,7 +77,7 @@ public class WorkNodeDao {
     }
 
     /**
-     * 清楚过去的节点信息（signed_at时间在一天前的记录）
+     * 清楚过期的雪花节点信息（signed_at时间在一天前的记录）
      *
      * @return 成功true, 失败false
      */
