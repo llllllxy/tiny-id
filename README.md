@@ -1,7 +1,7 @@
 # Tiny ID
 # 一个轻量、灵活、高性能的分布式 ID 生成器系统
 
-![SpringBoot](https://img.shields.io/badge/springboot-3.1.9-green.svg?style=flat-square)
+![SpringBoot](https://img.shields.io/badge/springboot-3.1.12-green.svg?style=flat-square)
 <a href="https://github.com/llllllxy/tiny-id/stargazers"><img src="https://img.shields.io/github/stars/llllllxy/tiny-id?style=flat-square&logo=GitHub"></a>
 <a href="https://github.com/llllllxy/tiny-id/network/members"><img src="https://img.shields.io/github/forks/llllllxy/tiny-id?style=flat-square&logo=GitHub"></a>
 <a href="https://github.com/llllllxy/tiny-id/watchers"><img src="https://img.shields.io/github/watchers/llllllxy/tiny-id?style=flat-square&logo=GitHub"></a>
@@ -51,6 +51,7 @@ Tiny ID 是一个基于SpringBoot+MySQL的轻量级、灵活、高性能的分�
 ## 主要技术选型
 
 1、后端：
+- Java 17
 - SpringBoot 3.1.12
 
 2、前端：
@@ -63,9 +64,9 @@ Tiny ID 是一个基于SpringBoot+MySQL的轻量级、灵活、高性能的分�
 
 ## 运行启动教程
 1. 新建`MySQL`数据库并导入`resources/init`文件夹下的数据库初始化脚本
-2. 修改配置文件中`application.properties`中数据库连接信息
+2. 修改配置文件中`application.yml`中数据库连接信息
 3. 运行启动类`TinyIdApplication`，即可正常启动项目
-4. 管理后台登录地址：`http://localhost:9999`  账户密码 `admin / 123456`
+4. 管理后台登录地址：`http://localhost:9999`  初始账户密码 `admin / 123456`
 
 ## 控制台功能
 1、仪表盘
@@ -86,15 +87,15 @@ Tiny ID 是一个基于SpringBoot+MySQL的轻量级、灵活、高性能的分�
     - 流水号前缀：拼接在流水号前的内容，如 QQ_00000001，QQ_00000002
     - 流水号后缀：拼接在流水号后的内容，如 00000001_QQ，00000002_QQ
       - 额外说明：
-        - 前缀和后缀支持时间格式替换，如下所示（示例，前缀为 ID_yyyy_，则生成的ID会是ID_2024_00000001这种形式的）
+        - 前缀和后缀支持时间格式替换，如下所示（示例，前缀为 ID_[yyyy]_，则生成的ID会是ID_2024_00000001这种形式的）
         - 假设当前时间为2024年2月25日3时11分23秒，如果前缀或后缀包含下列字符串
-        - yyyy：生成的流水号将该字符串替换为2024
-        - yy：生成的流水号将该字符串替换为24
-        - MM：生成的流水号将该字符串替换为02
-        - dd：生成的流水号将该字符串替换为25
-        - HH：生成的流水号将该字符串替换为03
-        - mm：生成的流水号将该字符串替换为11
-        - ss：生成的流水号将该字符串替换为23
+        - [yyyy]：生成的流水号将该字符串替换为2024
+        - [yy]：生成的流水号将该字符串替换为24
+        - [MM]：生成的流水号将该字符串替换为02
+        - [dd]：生成的流水号将该字符串替换为25
+        - [HH]：生成的流水号将该字符串替换为03
+        - [mm]：生成的流水号将该字符串替换为11
+        - [ss]：生成的流水号将该字符串替换为23
 
 
 ## 控制台功能界面展示
