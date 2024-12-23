@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.DuplicateKeyException;
@@ -22,12 +23,13 @@ import java.util.stream.Collectors;
 
 /**
  * <p>
- *  雪花id启动时执行类，自动生成未被使用的datacenterId和workerId
+ * 雪花id启动时执行类，自动生成未被使用的datacenterId和workerId
  * </p>
  *
  * @author liuxingyu01
  * @since 2024-04-27 10:17
  */
+@ConditionalOnProperty(prefix = "tinyid", name = "snowflake-loader", havingValue = "SnowflakeApplicationRunner")
 @Component
 @Order(98)
 public class SnowflakeApplicationRunner implements ApplicationRunner {

@@ -32,6 +32,8 @@ public class TWorkNode implements Serializable {
 
     private Long workerId;
 
+    private Long totalId;
+
     private Date createdAt;
 
     private Date updatedAt;

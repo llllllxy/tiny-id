@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 import org.tinycloud.tinyid.bean.dto.WorkNodeQueryDto;
 import org.tinycloud.tinyid.bean.entity.TWorkNode;
+import org.tinycloud.tinyid.utils.IdExtractor;
 import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
 
 import java.time.LocalDateTime;
@@ -53,6 +54,14 @@ public class WorkNodeDao {
     }
 
     /**
+     * 查询所有 id 并返回 List<Long>
+     */
+    public List<Long> getTotalIds() {
+        String sql = "SELECT total_id FROM t_worker_node";
+        return jdbcTemplate.queryForList(sql, Long.class);
+    }
+
+    /**
      * 保存WORKER_NODE
      *
      * @param serverIp     服务IP
@@ -61,8 +70,10 @@ public class WorkNodeDao {
      * @param datacenterId 数据中心IP
      */
     public void addWorkNode(String serverIp, Integer severPort, long workerId, long datacenterId) {
-        String sql = "INSERT INTO t_worker_node (server_ip, server_port, worker_id, datacenter_id, signed_at) VALUES (?,?,?,?,?)";
-        this.jdbcTemplate.update(sql, serverIp, severPort, workerId, datacenterId, new Date());
+        // 重新计算回totalId
+        long totalId = (int) IdExtractor.generateTotalId((int) datacenterId, (int) workerId);
+        String sql = "INSERT INTO t_worker_node (server_ip, server_port, worker_id, datacenter_id, total_id, signed_at) VALUES (?,?,?,?,?,?)";
+        this.jdbcTemplate.update(sql, serverIp, severPort, workerId, datacenterId, totalId, new Date());
     }
 
     /**

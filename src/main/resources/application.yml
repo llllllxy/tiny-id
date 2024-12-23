@@ -2,6 +2,7 @@ tinyid:
   name: tiny-id
   version: 1.0.0
   db-type: mysql
+  snowflake-loader: SnowflakeCommandLineRunner
 server:
   port: 9999
   servlet:

@@ -86,10 +86,12 @@ CREATE TABLE `t_worker_node`  (
   `server_port` int(4) NOT NULL COMMENT '服务端口号',
   `worker_id` bigint(20) NOT NULL COMMENT '工作节点ID',
   `datacenter_id` bigint(20) NOT NULL COMMENT '数据中心ID',
+  `total_id` bigint(20) NOT NULL COMMENT '总ID，由worker_id和datacenter_id计算得来',
   `created_at` datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime(0) NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP(0) COMMENT '更新时间',
   `signed_at` datetime(0) NULL DEFAULT NULL COMMENT '记录时间',
   PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `total_id_unique_index`(`total_id`) USING BTREE COMMENT '唯一索引',
   UNIQUE INDEX `worker_datacenter_unique_index`(`worker_id`, `datacenter_id`) USING BTREE COMMENT '联合唯一索引'
 ) ENGINE = InnoDB AUTO_INCREMENT = 16 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '服务节点表' ROW_FORMAT = Dynamic;
 

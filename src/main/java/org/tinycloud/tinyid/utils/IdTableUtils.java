@@ -31,6 +31,7 @@ import java.util.concurrent.Future;
 public class IdTableUtils {
     final static Logger logger = LoggerFactory.getLogger(IdTableUtils.class);
 
+    private static final String[] AFFIX_FORMAT_REGEX = {"[yyyy]", "[yy]", "[MM]", "[dd]", "[HH]", "[mm]", "[ss]"};
 
     private static final String[] AFFIX_FORMAT = {"yyyy", "yy", "MM", "dd", "HH", "mm", "ss"};
 
@@ -38,6 +39,7 @@ public class IdTableUtils {
 
 
     private static volatile IdTableDao idTableDao;
+
     private static IdTableDao getIdTableDao() {
         if (idTableDao == null) {
             synchronized (IdTableUtils.class) {
@@ -51,6 +53,7 @@ public class IdTableUtils {
 
 
     private static volatile ThreadPoolTaskExecutor threadPoolTaskExecutor;
+
     private static ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
         if (threadPoolTaskExecutor == null) {
             synchronized (IdTableUtils.class) {
@@ -232,13 +235,13 @@ public class IdTableUtils {
      * @param affix   前缀或者后缀内容
      *                特别说明如下：
      *                <p>假设当前时间为2019年2月25日3时11分23秒，如果前缀或后缀包含下列字符串</p>
-     *                <p>yyyy：生成的流水号将该字符串替换为2019</p>
-     *                <p>yy：生成的流水号将该字符串替换为19</p>
-     *                <p>MM：生成的流水号将该字符串替换为02</p>
-     *                <p>dd：生成的流水号将该字符串替换为25</p>
-     *                <p>HH：生成的流水号将该字符串替换为03</p>
-     *                <p>mm：生成的流水号将该字符串替换为11</p>
-     *                <p>ss：生成的流水号将该字符串替换为23</p>
+     *                <p>[yyyy]：生成的流水号将该字符串替换为2019</p>
+     *                <p>[yy]：生成的流水号将该字符串替换为19</p>
+     *                <p>[MM]：生成的流水号将该字符串替换为02</p>
+     *                <p>[dd]：生成的流水号将该字符串替换为25</p>
+     *                <p>[HH]：生成的流水号将该字符串替换为03</p>
+     *                <p>[mm]：生成的流水号将该字符串替换为11</p>
+     *                <p>[ss]：生成的流水号将该字符串替换为23</p>
      *                <p>以上日期时间字符，yyyyMMddHHmmss，区分大小写</p>
      * @return 转换后的前缀和后缀
      */
@@ -247,8 +250,8 @@ public class IdTableUtils {
             if (StringUtils.isNotBlank(affix)) {
                 Date dateTime = new Date();
                 affix = affix.trim();
-                for (String format : AFFIX_FORMAT) {
-                    affix = affix.replace(format, formatDate(dateTime, format));
+                for (int i = 0; i < AFFIX_FORMAT_REGEX.length; i++) {
+                    affix = affix.replace(AFFIX_FORMAT_REGEX[i], formatDate(dateTime, AFFIX_FORMAT[i]));
                 }
                 return affix;
             }
@@ -260,14 +263,7 @@ public class IdTableUtils {
     /**
      * 得到日期字符串 默认格式（yyyyMMdd） pattern可以为："yyyy-MM-dd" "HH:mm:ss" "E"
      */
-    public static String formatDate(Date date, String pattern) {
-        String formatDate = null;
-        if (date != null) {
-            if (StringUtils.isBlank(pattern)) {
-                pattern = "yyyyMMdd";
-            }
-            formatDate = FastDateFormat.getInstance(pattern).format(date);
-        }
-        return formatDate;
+    private static String formatDate(Date date, String pattern) {
+        return FastDateFormat.getInstance(pattern).format(date);
     }
 }
