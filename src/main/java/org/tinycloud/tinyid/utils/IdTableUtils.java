@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * <p>
@@ -31,39 +32,46 @@ import java.util.concurrent.Future;
 public class IdTableUtils {
     final static Logger logger = LoggerFactory.getLogger(IdTableUtils.class);
 
+    // 使用静态内部类实现延迟初始化
+    private static class BeanHolder {
+        static final IdTableDao ID_TABLE_DAO = initIdTableDao();
+        static final ThreadPoolTaskExecutor ASYNC_EXECUTOR = initAsyncExecutor();
+
+        private static IdTableDao initIdTableDao() {
+            try {
+                return SpringUtils.getBean(IdTableDao.class);
+            } catch (Exception e) {
+                logger.error("Failed to initialize IdTableDao", e);
+                throw new IllegalStateException("IdTableDao initialization failed", e);
+            }
+        }
+
+        private static ThreadPoolTaskExecutor initAsyncExecutor() {
+            try {
+                return SpringUtils.getBean("asyncServiceExecutor");
+            } catch (Exception e) {
+                logger.error("Failed to initialize asyncServiceExecutor", e);
+                throw new IllegalStateException("asyncServiceExecutor initialization failed", e);
+            }
+        }
+    }
+
+    // 直接访问的方法
+    private static IdTableDao getIdTableDao() {
+        return BeanHolder.ID_TABLE_DAO;
+    }
+
+    private static ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
+        return BeanHolder.ASYNC_EXECUTOR;
+    }
+
+
     private static final String[] AFFIX_FORMAT_REGEX = {"[yyyy]", "[yy]", "[MM]", "[dd]", "[HH]", "[mm]", "[ss]"};
 
     private static final String[] AFFIX_FORMAT = {"yyyy", "yy", "MM", "dd", "HH", "mm", "ss"};
 
-    public static final Map<String, SegmentId> segmentIdCacheMap = new ConcurrentHashMap<>();
+    private static final Map<String, SegmentId> segmentIdCacheMap = new ConcurrentHashMap<>();
 
-
-    private static volatile IdTableDao idTableDao;
-
-    private static IdTableDao getIdTableDao() {
-        if (idTableDao == null) {
-            synchronized (IdTableUtils.class) {
-                if (idTableDao == null) {
-                    idTableDao = SpringUtils.getBean(IdTableDao.class);
-                }
-            }
-        }
-        return idTableDao;
-    }
-
-
-    private static volatile ThreadPoolTaskExecutor threadPoolTaskExecutor;
-
-    private static ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
-        if (threadPoolTaskExecutor == null) {
-            synchronized (IdTableUtils.class) {
-                if (threadPoolTaskExecutor == null) {
-                    threadPoolTaskExecutor = SpringUtils.getBean("asyncServiceExecutor");
-                }
-            }
-        }
-        return threadPoolTaskExecutor;
-    }
 
     /**
      * 获取下一个流水号字符串
@@ -96,51 +104,49 @@ public class IdTableUtils {
      * @param idCode 流水号编码
      * @return String 流水号字符串
      */
-    public synchronized static String takeNextId(String idCode) {
-        while (true) {
-            SegmentId segmentId = segmentIdCacheMap.get(idCode);
-            // 没有这个队列的话，那就新建一个队列
-            if (segmentId == null) {
-                TIdTable idTable = getIdTableDao().get(idCode);
-                if (idTable == null) {
-                    throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
-                } else {
-                    ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
-                    segmentId = new SegmentId(queue, idTable.getIdStep());
-                    segmentIdCacheMap.put(idCode, segmentId);
-                }
+    public static String takeNextId(String idCode) {
+        // 使用computeIfAbsent确保每个idCode只有一个SegmentId
+        final SegmentId segmentId = segmentIdCacheMap.computeIfAbsent(idCode, key -> {
+            TIdTable idTable = getIdTableDao().get(key);
+            if (idTable == null) {
+                throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
             }
-            // 获取队列缓存的长度，判断是否大于0
-            final ConcurrentLinkedQueue<String> queue = segmentId.getQueue();
-            if (queue.size() > 0) {
-                // 当剩余不足时，异步预加载下一号段
-                if (!segmentId.isPreloaded()
-                        && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
-                    SegmentId finalSegmentId = segmentId;
-                    Future<?> future = getThreadPoolTaskExecutor().submit(() -> {
-                        // 按照步长，生成id推送到队列里
+            ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
+            return new SegmentId(queue, idTable.getIdStep());
+        });
+
+        synchronized (segmentId) {
+            while (true) {
+                // 获取队列缓存的长度，判断是否大于0
+                final ConcurrentLinkedQueue<String> queue = segmentId.getQueue();
+                if (!queue.isEmpty()) {
+                    // 当剩余不足时，异步预加载下一号段
+                    if (!segmentId.isPreloaded() && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
+                        Future<?> future = getThreadPoolTaskExecutor().submit(() -> {
+                            // 按照步长，生成id推送到队列里
+                            List<String> ids = generateNextIds(idCode);
+                            ids.forEach(queue::offer);
+                            // 移除正在进行预加载的标志
+                            segmentId.setPreloaded(false);
+                        });
+                        // 设置正在进行预加载的标志
+                        segmentId.setPreloaded(true);
+                        segmentId.setFuture(future);
+                    }
+                    return queue.poll();
+                } else {
+                    if (segmentId.isPreloaded()) {
+                        // 等待异步线程返回
+                        try {
+                            segmentId.getFuture().get();
+                        } catch (Exception e) {
+                            logger.error("error query segmentId: {}", e.getMessage(), e);
+                        }
+                    } else {
+                        // 第一次加载，按照步长，生成id推送到队列里
                         List<String> ids = generateNextIds(idCode);
                         ids.forEach(queue::offer);
-                        // 移除正在进行预加载的标志
-                        finalSegmentId.setPreloaded(false);
-                    });
-                    // 设置正在进行预加载的标志
-                    segmentId.setPreloaded(true);
-                    segmentId.setFuture(future);
-                }
-                return queue.poll();
-            } else {
-                if (segmentId.isPreloaded()) {
-                    // 等待异步线程返回
-                    try {
-                        segmentId.getFuture().get();
-                    } catch (Exception e) {
-                        logger.error("error query segmentId: {}", e.getMessage(), e);
                     }
-                } else {
-                    // 第一次加载，按照步长，生成id推送到队列里
-                    List<String> ids = generateNextIds(idCode);
-                    ids.forEach(queue::offer);
                 }
             }
         }
