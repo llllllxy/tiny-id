@@ -1,6 +1,7 @@
 # Tiny ID
 # 一个轻量、灵活、高性能的分布式 ID 生成器系统
 
+![Java](https://img.shields.io/badge/java-17-green.svg?style=flat-square)
 ![SpringBoot](https://img.shields.io/badge/springboot-3.1.12-green.svg?style=flat-square)
 <a href="https://github.com/llllllxy/tiny-id/stargazers"><img src="https://img.shields.io/github/stars/llllllxy/tiny-id?style=flat-square&logo=GitHub"></a>
 <a href="https://github.com/llllllxy/tiny-id/network/members"><img src="https://img.shields.io/github/forks/llllllxy/tiny-id?style=flat-square&logo=GitHub"></a>
@@ -20,6 +21,9 @@ Tiny ID 是一个基于SpringBoot+MySQL的轻量级、灵活、高性能的分�
 - `snowflake雪花算法` 模式，支持服务启动时自动分配数据中心ID和机器ID，无需手动配置。
 - 通过http方式访问生成id，简洁灵活，方便业务系统接入。
 - 提供控制台管理功能，支持数据监控、雪花ID节点查看，流水号管理等功能，界面操作友好。
+
+## 架构
+![架构图](src/main/resources/static/images/readme/架构图.png)
 
 ## 性能
 测试环境：windows 4核心、16G内存
