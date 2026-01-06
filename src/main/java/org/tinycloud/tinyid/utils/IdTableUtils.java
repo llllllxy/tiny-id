@@ -1,7 +1,5 @@
 package org.tinycloud.tinyid.utils;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.time.FastDateFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -12,14 +10,12 @@ import org.tinycloud.tinyid.dao.IdTableDao;
 import org.tinycloud.tinyid.enums.CoreErrorCode;
 import org.tinycloud.tinyid.exception.CoreException;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * <p>
@@ -31,6 +27,19 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class IdTableUtils {
     final static Logger logger = LoggerFactory.getLogger(IdTableUtils.class);
+
+    private static final Map<String, DateTimeFormatter> AFFIX_FORMATTER_MAP = new LinkedHashMap<>();
+
+    static {
+        AFFIX_FORMATTER_MAP.put("[yyyy]", DateTimeFormatter.ofPattern("yyyy"));
+        AFFIX_FORMATTER_MAP.put("[yy]", DateTimeFormatter.ofPattern("yy"));
+        AFFIX_FORMATTER_MAP.put("[MM]", DateTimeFormatter.ofPattern("MM"));
+        AFFIX_FORMATTER_MAP.put("[dd]", DateTimeFormatter.ofPattern("dd"));
+        AFFIX_FORMATTER_MAP.put("[HH]", DateTimeFormatter.ofPattern("HH"));
+        AFFIX_FORMATTER_MAP.put("[mm]", DateTimeFormatter.ofPattern("mm"));
+        AFFIX_FORMATTER_MAP.put("[ss]", DateTimeFormatter.ofPattern("ss"));
+    }
+
 
     // 使用静态内部类实现延迟初始化
     private static class BeanHolder {
@@ -64,11 +73,6 @@ public class IdTableUtils {
     private static ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
         return BeanHolder.ASYNC_EXECUTOR;
     }
-
-
-    private static final String[] AFFIX_FORMAT_REGEX = {"[yyyy]", "[yy]", "[MM]", "[dd]", "[HH]", "[mm]", "[ss]"};
-
-    private static final String[] AFFIX_FORMAT = {"yyyy", "yy", "MM", "dd", "HH", "mm", "ss"};
 
     private static final Map<String, SegmentId> segmentIdCacheMap = new ConcurrentHashMap<>();
 
@@ -157,7 +161,7 @@ public class IdTableUtils {
      * 批类构造流水号字符串
      *
      * @param idCode idCode
-     * @return List<String> 流水号列表
+     * @return 流水号List列表
      */
     private static List<String> generateNextIds(String idCode) {
         // 刷新数据库里的步长
@@ -178,41 +182,34 @@ public class IdTableUtils {
     /**
      * 根据规则构造流水号字符串
      *
-     * @param idTable     流水号Map
-     * @param nextIdValue 流水号当前值
+     * @param idTable     流水号规则配置
+     * @param nextIdValue 流水号当前数值
      * @return String 流水号字符串
      */
     private static String generateNextId(TIdTable idTable, long nextIdValue) {
-        String retStr = "";
         try {
-            // 补充前缀内容
-            Integer hasPrefix = idTable.getHasPrefix();
-            String idPrefix = idTable.getIdPrefix() != null ? idTable.getIdPrefix() : "";
-            idPrefix = compoundAffix(hasPrefix, idPrefix);
-
-            // 补充后缀内容
-            Integer hasSuffix = idTable.getHasSuffix();
-            String idSuffix = idTable.getIdSuffix() != null ? idTable.getIdSuffix() : "";
-            idSuffix = compoundAffix(hasSuffix, idSuffix);
-
-            // id长度
-            int numLen = idTable.getIdLength() - idPrefix.length() - idSuffix.length();
-            if (numLen < String.valueOf(nextIdValue).length()) {
+            // 1. 统一处理前缀和后缀
+            String prefix = compoundAffix(idTable.getHasPrefix(), idTable.getIdPrefix());
+            String suffix = compoundAffix(idTable.getHasSuffix(), idTable.getIdSuffix());
+            // 2. 使用 Optional 安全地获取 ID 长度
+            int totalLength = Optional.ofNullable(idTable.getIdLength()).orElseThrow(() -> new CoreException(CoreErrorCode.THE_ID_LENGTH_CONFIG_MISSING));
+            // 3. 计算数字部分的长度
+            int numericPartLength = totalLength - prefix.length() - suffix.length();
+            // 4. 校验数字部分长度是否足够
+            if (numericPartLength < Long.toString(nextIdValue).length()) {
                 throw new CoreException(CoreErrorCode.THE_ID_LENGTH_IS_NOT_ENOUGH);
-            } else {
-                String maxIdStr = get0Str(nextIdValue, numLen);
-                retStr = idPrefix + maxIdStr + idSuffix;
             }
-            return retStr;
+            // 5. 拼接最终的流水号
+            String paddedNumber = getPaddedNumber(nextIdValue, numericPartLength);
+            return prefix + paddedNumber + suffix;
+        } catch (CoreException e) {
+            // 6. 只记录日志，直接抛出原始的业务异常，不进行包装
+            logger.error("生成业务流水号[{}]失败: {}", idTable.getIdCode(), e.getMessage(), e);
+            throw e;
         } catch (Exception e) {
-            if (logger.isErrorEnabled()) {
-                logger.error("generateNextId - 获取业务流水号[" + idTable.getIdCode() + "]出错,Exception: ", e);
-            }
-            if (e instanceof CoreException) {
-                throw new CoreException(((CoreException) e).getCode(), ((CoreException) e).getMessage());
-            } else {
-                throw new CoreException(CoreErrorCode.SERIOUSLY_ERROR);
-            }
+            // 7. 捕获所有其他非预期异常，包装成系统级严重错误
+            logger.error("生成业务流水号[" + idTable.getIdCode() + "]时发生未知错误", e);
+            throw new CoreException(CoreErrorCode.SERIOUSLY_ERROR);
         }
     }
 
@@ -224,9 +221,9 @@ public class IdTableUtils {
      * @param numLen      位数
      * @return 补零后的数字字符串
      */
-    private static String get0Str(long nextIdValue, int numLen) {
+    private static String getPaddedNumber(long nextIdValue, int numLen) {
         StringBuilder retStr = new StringBuilder();
-        int needLen = numLen - String.valueOf(nextIdValue).length();
+        int needLen = numLen - Long.toString(nextIdValue).length();
         for (int i = 0; i < needLen; i++) {
             retStr.append("0");
         }
@@ -237,39 +234,30 @@ public class IdTableUtils {
     /**
      * 完善前缀和后缀
      *
-     * @param isAffix 是否有前缀或者后缀 1有 0无
-     * @param affix   前缀或者后缀内容
-     *                特别说明如下：
-     *                <p>假设当前时间为2019年2月25日3时11分23秒，如果前缀或后缀包含下列字符串</p>
-     *                <p>[yyyy]：生成的流水号将该字符串替换为2019</p>
-     *                <p>[yy]：生成的流水号将该字符串替换为19</p>
-     *                <p>[MM]：生成的流水号将该字符串替换为02</p>
-     *                <p>[dd]：生成的流水号将该字符串替换为25</p>
-     *                <p>[HH]：生成的流水号将该字符串替换为03</p>
-     *                <p>[mm]：生成的流水号将该字符串替换为11</p>
-     *                <p>[ss]：生成的流水号将该字符串替换为23</p>
-     *                <p>以上日期时间字符，yyyyMMddHHmmss，区分大小写</p>
+     * @param hasAffix 是否有前缀或者后缀 1有 0无
+     * @param affix    前缀或者后缀内容
+     *                 特别说明如下：
+     *                 <p>假设当前时间为2019年2月25日3时11分23秒，如果前缀或后缀包含下列字符串</p>
+     *                 <p>[yyyy]：生成的流水号将该字符串替换为2019</p>
+     *                 <p>[yy]：生成的流水号将该字符串替换为19</p>
+     *                 <p>[MM]：生成的流水号将该字符串替换为02</p>
+     *                 <p>[dd]：生成的流水号将该字符串替换为25</p>
+     *                 <p>[HH]：生成的流水号将该字符串替换为03</p>
+     *                 <p>[mm]：生成的流水号将该字符串替换为11</p>
+     *                 <p>[ss]：生成的流水号将该字符串替换为23</p>
+     *                 <p>以上日期时间字符，yyyyMMddHHmmss，区分大小写</p>
      * @return 转换后的前缀和后缀
      */
-    private static String compoundAffix(Integer isAffix, String affix) {
-        if (isAffix != null && isAffix.equals(1)) {
-            if (StringUtils.isNotBlank(affix)) {
-                Date dateTime = new Date();
-                affix = affix.trim();
-                for (int i = 0; i < AFFIX_FORMAT_REGEX.length; i++) {
-                    affix = affix.replace(AFFIX_FORMAT_REGEX[i], formatDate(dateTime, AFFIX_FORMAT[i]));
-                }
-                return affix;
-            }
+    private static String compoundAffix(Integer hasAffix, String affix) {
+        // 1. 前置条件检查：如果不需要处理或 affix 为空，则直接返回空字符串
+        if (hasAffix == null || hasAffix != 1 || affix == null || affix.isEmpty()) {
+            return "";
         }
-        return "";
-    }
-
-
-    /**
-     * 得到日期字符串 默认格式（yyyyMMdd） pattern可以为："yyyy-MM-dd" "HH:mm:ss" "E"
-     */
-    private static String formatDate(Date date, String pattern) {
-        return FastDateFormat.getInstance(pattern).format(date);
+        LocalDateTime now = LocalDateTime.now();
+        String result = affix.trim();
+        for (var entry : AFFIX_FORMATTER_MAP.entrySet()) {
+            result = result.replace(entry.getKey(), now.format(entry.getValue()));
+        }
+        return result;
     }
 }

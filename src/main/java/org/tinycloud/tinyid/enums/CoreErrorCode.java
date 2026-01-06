@@ -3,6 +3,7 @@ package org.tinycloud.tinyid.enums;
 public enum CoreErrorCode {
     THIS_IDCODE_IS_NOT_EXIST(1001, "此idCode不存在！"),
     THE_ID_LENGTH_IS_NOT_ENOUGH(1002, "编码长度不够，请增加编码长度！"),
+    THE_ID_LENGTH_CONFIG_MISSING(1003, "编码长度配置缺失！"),
 
     USERNAME_OR_PASSWORD_MISMATCH(2001, "用户名或密码错误！"),
     USER_IS_DISABLED(2002, "用户已被停用！"),
