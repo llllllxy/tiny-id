@@ -60,5 +60,5 @@ async:
       core-pool-size: 5
       keep-alive-seconds: 60
       max-pool-size: 20
-      name-prefix: async-service-
+      name-prefix: tinyid-async-
       queue-capacity: 200
