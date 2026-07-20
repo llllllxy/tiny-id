@@ -37,15 +37,17 @@ public class IdTableDao {
      * @param idCode 编码
      * @return TIdTable
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public TIdTable refreshByIdCode(String idCode) {
-        // 这条语句自带行锁，相当于 select for update了
-        String sql2 = "UPDATE t_idtable SET id_value = id_value + id_step WHERE id_code = ?";
-        int num2 = this.jdbcTemplate.update(sql2, idCode);
+        // 对同一行执行 UPDATE 时，数据库会加行级锁，保证并发更新的原子性
+        String updateSql = "UPDATE t_idtable SET id_value = id_value + id_step WHERE id_code = ?";
+        int rows = this.jdbcTemplate.update(updateSql, idCode);
+        if (rows != 1) {
+            throw new IllegalStateException("刷新流水号失败, idCode=" + idCode);
+        }
 
-        String sql3 = "SELECT * FROM t_idtable WHERE id_code = ?";
-        TIdTable idTable = this.jdbcTemplate.queryForObject(sql3, BeanPropertyRowMapper.newInstance(TIdTable.class), idCode);
-        return idTable;
+        String selectSql = "SELECT * FROM t_idtable WHERE id_code = ?";
+        return this.jdbcTemplate.queryForObject(selectSql, BeanPropertyRowMapper.newInstance(TIdTable.class), idCode);
     }
 
     /**
