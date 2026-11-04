@@ -14,16 +14,31 @@ import java.util.List;
  */
 public class SnowflakeSingleton {
 
-    public static long workerId;
+    private static volatile long workerId = -1L;
 
-    public static long datacenterId;
+    private static volatile long datacenterId = -1L;
 
     private static SnowflakeId snowflakeIdObj;
 
-    public static void init(long workerId, long datacenterId) {
+    public static synchronized void init(long workerId, long datacenterId) {
+        if (snowflakeIdObj != null) {
+            return;
+        }
         SnowflakeSingleton.workerId = workerId;
         SnowflakeSingleton.datacenterId = datacenterId;
         snowflakeIdObj = new SnowflakeId(workerId, datacenterId);
+    }
+
+    public static long getWorkerId() {
+        return workerId;
+    }
+
+    public static long getDatacenterId() {
+        return datacenterId;
+    }
+
+    public static boolean isInitialized() {
+        return snowflakeIdObj != null;
     }
 
     /**

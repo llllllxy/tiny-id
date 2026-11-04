@@ -46,7 +46,7 @@ public class SnowflakeApplicationRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         logger.info("Initialization snowflake start!");
-        Long count = this.workNodeDao.getDistinctDatacenterIds();
+        Long count = this.workNodeDao.getUsedTotalIdCount();
         if (count >= 32L * 32L) {
             throw new IllegalStateException("datacenterId was used up, aborting application startup!");
         }

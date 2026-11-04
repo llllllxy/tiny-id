@@ -32,6 +32,11 @@ import java.util.concurrent.ThreadLocalRandom;
 public class SnowflakeCommandLineRunner implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(SnowflakeCommandLineRunner.class);
 
+    /**
+     * 节点组合分配的最大重试次数，超过后直接失败终止启动，避免无限循环空转
+     */
+    private static final int MAX_ASSIGN_RETRY = 100;
+
     @Autowired
     private WorkNodeDao workNodeDao;
 
@@ -41,7 +46,7 @@ public class SnowflakeCommandLineRunner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         logger.info("Initialization snowflake start!");
-        Long count = this.workNodeDao.getDistinctDatacenterIds();
+        Long count = this.workNodeDao.getUsedTotalIdCount();
         if (count >= 32L * 32L) {
             throw new IllegalStateException("datacenterId was used up, aborting application startup!");
         }
@@ -54,8 +59,9 @@ public class SnowflakeCommandLineRunner implements CommandLineRunner {
 
         logger.info("Initialization snowflake totalIdList:" + totalIdList);
 
-        boolean condition = true;
-        while (condition) {
+        boolean assigned = false;
+        int retryCount = 0;
+        while (!assigned) {
             long nextTotalId;
             do {
                 // 重新获取
@@ -70,14 +76,19 @@ public class SnowflakeCommandLineRunner implements CommandLineRunner {
                 this.workNodeDao.addWorkNode(hostAddress, environment.getProperty("server.port", Integer.class), workerId, datacenterId);
                 // 第三步、加载全局Snowflake对象
                 SnowflakeSingleton.init(workerId, datacenterId);
-                condition = false;
+                assigned = true;
+            } catch (DuplicateKeyException e) {
+                // 唯一索引冲突：该组合已被其它节点抢注，刷新已占用集合后重试
+                logger.warn("DuplicateKeyException, retry assigning snowflake node: {}", e.getMessage());
+                totalIdList.add(nextTotalId);
+                retryCount++;
             } catch (Exception e) {
-                if (e instanceof DuplicateKeyException) {
-                    logger.error("DuplicateKeyException: ", e);
-                } else {
-                    logger.error("Other Exception : ", e);
-                    throw e;
-                }
+                logger.error("Other Exception : ", e);
+                throw e;
+            }
+
+            if (!assigned && retryCount >= MAX_ASSIGN_RETRY) {
+                throw new IllegalStateException("Failed to assign snowflake node after " + MAX_ASSIGN_RETRY + " retries, aborting application startup!");
             }
         }
         logger.info("Initialization snowflake end!");
