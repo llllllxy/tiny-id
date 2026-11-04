@@ -3,7 +3,7 @@
     <!--默认配置-->
     <include resource="org/springframework/boot/logging/logback/defaults.xml" />
     <!-- 日志存放路径 -->
-    <property name="LOG_PATH" value="/opt/tinyid/logs"/>
+    <property name="LOG_PATH" value="./logs"/>
     <!-- 日志输出格式 -->
     <property name="CONSOLE_LOG_PATTERN"
               value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%-5level] [%X{traceId}] %c [%method,%line]  : %msg%n"/>
