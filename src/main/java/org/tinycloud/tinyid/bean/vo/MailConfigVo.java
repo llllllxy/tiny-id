@@ -1,0 +1,57 @@
+package org.tinycloud.tinyid.bean.vo;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serial;
+import java.io.Serializable;
+
+/**
+ * <p>
+ * 邮件配置-Vo
+ * </p>
+ *
+ * @author liuxingyu01
+ * @since 2026-11-04
+ */
+@Setter
+@Getter
+public class MailConfigVo implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 自增主键，内码
+     */
+    private Long id;
+
+    /**
+     * smtp服务器地址
+     */
+    private String smtpAddress;
+
+    /**
+     * smtp端口
+     */
+    private String smtpPort;
+
+    /**
+     * 邮箱账号
+     */
+    private String emailAccount;
+
+    /**
+     * 邮箱密码
+     */
+    private String emailPassword;
+
+    /**
+     * 收件邮箱地址(多个用逗号隔开)
+     */
+    private String receiveEmail;
+
+    /**
+     * 是否开启 ssl（0-- 开启 --1 关闭）
+     */
+    private String sslFlag;
+}

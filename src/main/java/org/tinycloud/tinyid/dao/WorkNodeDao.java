@@ -1,6 +1,9 @@
 package org.tinycloud.tinyid.dao;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -8,6 +11,7 @@ import org.springframework.util.StringUtils;
 import org.tinycloud.tinyid.bean.dto.WorkNodeQueryDto;
 import org.tinycloud.tinyid.bean.entity.TWorkNode;
 import org.tinycloud.tinyid.utils.IdExtractor;
+import org.tinycloud.tinyid.utils.LocalHostUtils;
 import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
 
 import java.time.LocalDateTime;
@@ -23,11 +27,18 @@ import java.util.List;
  * @author liuxingyu01
  * @since 2024-04-27 10:58
  */
+@Slf4j
 @Repository
 public class WorkNodeDao {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    /**
+     * 本机注册用的服务端口，与启动时注册保持一致
+     */
+    @Value("${server.port}")
+    private Integer serverPort;
 
 
     /**
@@ -87,6 +98,30 @@ public class WorkNodeDao {
         }
         String sql = "UPDATE t_worker_node SET signed_at = ? WHERE datacenter_id = ? AND worker_id = ?";
         int num = this.jdbcTemplate.update(sql, new Date(), SnowflakeSingleton.getDatacenterId(), SnowflakeSingleton.getWorkerId());
+        if (num == 0) {
+            // 心跳行不存在：典型场景是 DB 长时间断连（雪花发号不依赖DB，服务仍在运行），
+            // 恢复后心跳行被 clean 任务清理。必须立即重新注册自己，
+            // 否则本节点的 (datacenterId, workerId) 会被新实例注册复用，造成雪花ID重复
+            log.warn("节点心跳行不存在，尝试重新注册, datacenterId={}, workerId={}",
+                    SnowflakeSingleton.getDatacenterId(), SnowflakeSingleton.getWorkerId());
+            try {
+                this.addWorkNode(LocalHostUtils.getInetAddress().getHostAddress(), serverPort,
+                        SnowflakeSingleton.getWorkerId(), SnowflakeSingleton.getDatacenterId());
+                log.warn("节点重新注册成功, datacenterId={}, workerId={}",
+                        SnowflakeSingleton.getDatacenterId(), SnowflakeSingleton.getWorkerId());
+                return true;
+            } catch (DuplicateKeyException e) {
+                // 身份组合已被其它实例抢注：本节点曾失联超期且ID已被占用，继续发号有重复风险，需人工介入
+                log.error("节点重新注册失败，(datacenterId, workerId) 已被其它实例占用，存在雪花ID重复风险，" +
+                        "请立即下线本节点并重新分配, datacenterId={}, workerId={}",
+                        SnowflakeSingleton.getDatacenterId(), SnowflakeSingleton.getWorkerId());
+                return false;
+            } catch (Exception e) {
+                log.error("节点重新注册异常, datacenterId={}, workerId={}",
+                        SnowflakeSingleton.getDatacenterId(), SnowflakeSingleton.getWorkerId(), e);
+                return false;
+            }
+        }
         return num > 0;
     }
 
