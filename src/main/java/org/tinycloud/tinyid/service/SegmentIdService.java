@@ -47,12 +47,6 @@ public class SegmentIdService {
      */
     private static final long ASYNC_LOAD_TIMEOUT_MILLIS = 5000L;
 
-    /**
-     * 单次批量取号的最大数量上限。
-     * 防止超大批量请求循环期间反复触发号段加载刷库，批量更大时应分多次调用。
-     */
-    private static final int MAX_BATCH_SIZE = 1000;
-
     @Autowired
     private IdTableDao idTableDao;
 
@@ -84,7 +78,7 @@ public class SegmentIdService {
      */
     public List<String> nextBatchId(String idCode, Integer batchSize) {
         // 校验批量大小：防止拆箱 NPE、负数或 0，以及超大批量在循环中反复触发号段加载刷库
-        if (batchSize == null || batchSize < 1 || batchSize > MAX_BATCH_SIZE) {
+        if (batchSize == null || batchSize < 1 || batchSize > GlobalConstant.MAX_BATCH_SIZE) {
             throw new CoreException(CoreErrorCode.THE_BATCH_SIZE_IS_INVALID);
         }
         // 预分配容量，避免批量较大时 ArrayList 反复扩容拷贝

@@ -41,4 +41,10 @@ public class GlobalConstant {
      * 预加载下个号段的百分比
      */
     public static final int LOADING_PERCENT = 20;
+
+    /**
+     * 单次批量取号的最大数量上限（号段模式与雪花模式共用）。
+     * 防止超大批量请求循环期间反复触发号段加载刷库或长时间占用请求线程。
+     */
+    public static final int MAX_BATCH_SIZE = 1000;
 }

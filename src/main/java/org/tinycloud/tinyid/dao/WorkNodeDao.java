@@ -14,11 +14,10 @@ import org.tinycloud.tinyid.utils.IdExtractor;
 import org.tinycloud.tinyid.utils.LocalHostUtils;
 import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -131,16 +130,13 @@ public class WorkNodeDao {
      * @return 成功true, 失败false
      */
     public boolean clean() {
-        // 获取当前时间
-        LocalDateTime currentTime = LocalDateTime.now();
-        // 获取一天以前的时间
-        LocalDateTime oneDayAgoTime = currentTime.minusDays(1);
-        // 定义日期时间格式
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        String oneDayAgoTimeStr = oneDayAgoTime.format(formatter);
+        // 与sign()保持一致：使用JDBC时间类型传参，由驱动按serverTimezone统一转换。
+        // 原实现用应用本地时间的字符串与DB比较，应用与DB时区不一致（如容器内UTC）时
+        // 会使"保留1天"实际缩短约8小时，导致误删活节点心跳
+        Date oneDayAgo = new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1));
 
         String sql = "DELETE FROM t_worker_node WHERE signed_at < ?";
-        int num = this.jdbcTemplate.update(sql, oneDayAgoTimeStr);
+        int num = this.jdbcTemplate.update(sql, oneDayAgo);
         return num > 0;
     }
 

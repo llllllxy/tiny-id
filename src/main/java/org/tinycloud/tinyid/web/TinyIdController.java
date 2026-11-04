@@ -5,6 +5,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+import org.tinycloud.tinyid.constant.GlobalConstant;
+import org.tinycloud.tinyid.enums.CoreErrorCode;
+import org.tinycloud.tinyid.exception.CoreException;
 import org.tinycloud.tinyid.model.ApiResult;
 import org.tinycloud.tinyid.service.SegmentIdService;
 import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
@@ -32,6 +35,10 @@ public class TinyIdController {
 
     @RequestMapping(value = "/snowflake/batch/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<List<Long>> getSnowflakeId(@PathVariable("batchSize") Integer batchSize) {
+        // 校验批量大小，防止超大批量请求长时间占用请求线程
+        if (batchSize == null || batchSize < 1 || batchSize > GlobalConstant.MAX_BATCH_SIZE) {
+            throw new CoreException(CoreErrorCode.THE_BATCH_SIZE_IS_INVALID);
+        }
         return ApiResult.success(SnowflakeSingleton.nextBatchLongId(batchSize), "批量获取成功");
     }
 
