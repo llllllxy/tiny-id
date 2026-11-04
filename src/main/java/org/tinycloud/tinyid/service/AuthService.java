@@ -121,7 +121,9 @@ public class AuthService {
 
 
     public boolean setting(AuthEditInfoDto dto) {
-        int rows = this.userDao.settingInfo(dto);
+        // 防水平越权：更新主体强制取当前登录人，客户端传入的 username 不可信，一律忽略
+        String username = (String) AuthUtils.getLoginId();
+        int rows = this.userDao.settingInfo(dto, username);
         return rows > 0;
     }
 }

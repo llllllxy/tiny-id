@@ -4,7 +4,12 @@ import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.tinycloud.tinyid.bean.dto.AuthEditInfoDto;
 import org.tinycloud.tinyid.bean.dto.AuthLoginDto;
 import org.tinycloud.tinyid.bean.entity.TUser;
 import org.tinycloud.tinyid.constant.GlobalConstant;
@@ -114,5 +119,32 @@ class AuthServiceTest {
         // 模拟服务端已消费：第二次取不到验证码
         when(session.getAttribute(CAPTCHA_SESSION_KEY)).thenReturn(null);
         assertThrows(CoreException.class, () -> authService.authentication(buildLoginDto("Ab12"), session));
+    }
+
+    /**
+     * 场景：修改资料防水平越权。客户端伪造 username 指向他人（如管理员）时，
+     * 更新主体必须是当前登录人，而不是 DTO 里客户端任意传的 username。
+     */
+    @Test
+    void settingShouldUseLoginUserAsUpdateSubject() {
+        // 构造当前登录会话：登录人是 admin
+        MockHttpSession mockSession = new MockHttpSession();
+        mockSession.setAttribute(GlobalConstant.SESSION_KEY, "admin");
+        MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+        servletRequest.setSession(mockSession);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(servletRequest));
+        try {
+            AuthEditInfoDto dto = new AuthEditInfoDto();
+            // 客户端伪造越权目标
+            dto.setUsername("root");
+            dto.setNickname("hacked");
+
+            when(userDao.settingInfo(dto, "admin")).thenReturn(1);
+            assertDoesNotThrow(() -> authService.setting(dto));
+            // 更新主体必须是当前登录人 admin，而不是 dto 里伪造的 root
+            verify(userDao).settingInfo(dto, "admin");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
     }
 }

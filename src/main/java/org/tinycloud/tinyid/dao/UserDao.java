@@ -39,9 +39,16 @@ public class UserDao {
         return num2;
     }
 
-    public int settingInfo(AuthEditInfoDto dto) {
+    /**
+     * 修改用户个人信息
+     *
+     * @param dto      资料（昵称/联系方式/邮箱）
+     * @param username 更新主体用户名，由服务层强制指定为当前登录人，防止越权
+     * @return 影响行数
+     */
+    public int settingInfo(AuthEditInfoDto dto, String username) {
         String sql2 = "UPDATE t_user SET nickname = ?, phone = ?, email = ? WHERE username = ?";
-        int num2 = this.jdbcTemplate.update(sql2, dto.getNickname(), dto.getPhone(), dto.getEmail(), dto.getUsername());
+        int num2 = this.jdbcTemplate.update(sql2, dto.getNickname(), dto.getPhone(), dto.getEmail(), username);
         return num2;
     }
 }
