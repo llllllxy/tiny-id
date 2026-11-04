@@ -27,17 +27,17 @@ public final class SegmentId {
     /**
      * 号段缓存队列，存放已预取、待消费的流水号字符串
      */
-    private volatile ConcurrentLinkedQueue<String> queue;
+    private final ConcurrentLinkedQueue<String> queue;
 
     /**
      * 号段步长：每次从数据库预取的 ID 数量，也是触发预加载的阈值基准
      */
-    private Integer step;
+    private final Integer step;
 
     /**
      * 是否正在进行异步预加载下一号段（true=预加载任务进行中）
      */
-    private volatile Boolean preloaded = false;
+    private volatile boolean preloaded = false;
 
     /**
      * 异步预加载任务句柄，用于队列空时阻塞等待预加载结果
@@ -59,23 +59,15 @@ public final class SegmentId {
         return queue;
     }
 
-    public void setQueue(ConcurrentLinkedQueue<String> queue) {
-        this.queue = queue;
-    }
-
     public Integer getStep() {
         return step;
     }
 
-    public void setStep(Integer step) {
-        this.step = step;
-    }
-
-    public Boolean isPreloaded() {
+    public boolean isPreloaded() {
         return preloaded;
     }
 
-    public void setPreloaded(Boolean preloaded) {
+    public void setPreloaded(boolean preloaded) {
         this.preloaded = preloaded;
     }
 

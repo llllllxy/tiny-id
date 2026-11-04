@@ -20,7 +20,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * <p>
@@ -36,6 +39,13 @@ import java.util.concurrent.Future;
 @Service
 public class SegmentIdService {
     private static final Logger logger = LoggerFactory.getLogger(SegmentIdService.class);
+
+    /**
+     * 等待异步预加载号段的最长等待时间（毫秒）。
+     * 取号段是单次 DB 查询，正常几十毫秒；超时说明预加载已异常，走同步兜底快速失败，
+     * 不宜设太长，否则会长时间占用工作线程，并发高时拖垮整个服务。
+     */
+    private static final long ASYNC_LOAD_TIMEOUT_MILLIS = 5000L;
 
     @Autowired
     private IdTableDao idTableDao;
@@ -97,25 +107,49 @@ public class SegmentIdService {
                 if (!queue.isEmpty()) {
                     // 当剩余不足时，异步预加载下一号段
                     if (!segmentId.isPreloaded() && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
-                        Future<?> future = this.asyncServiceExecutor.submit(() -> {
-                            List<String> ids = generateNextIds(idCode);
-                            ids.forEach(queue::offer);
-                            segmentId.setPreloaded(false);
-                        });
+                        // 先置标志再提交任务：保证异步任务的复位动作必然发生在这之后，
+                        // 避免任务瞬间跑完后标志被主线程覆盖回 true，导致「true 但无任务在跑」的死循环
                         segmentId.setPreloaded(true);
-                        segmentId.setFuture(future);
+                        try {
+                            Future<?> future = this.asyncServiceExecutor.submit(() -> {
+                                try {
+                                    List<String> ids = generateNextIds(idCode);
+                                    ids.forEach(queue::offer);
+                                } catch (Exception e) {
+                                    // 预加载失败只记录日志，由取号方感知队列为空后走同步兜底
+                                    logger.error("异步预加载号段失败, idCode={}", idCode, e);
+                                } finally {
+                                    // 无论成功失败一定复位，否则队列耗尽时取号线程会无限空转
+                                    segmentId.setPreloaded(false);
+                                }
+                            });
+                            segmentId.setFuture(future);
+                        } catch (Exception e) {
+                            // 线程池关闭或饱和导致提交失败时复位标志，否则又是一个卡死入口
+                            segmentId.setPreloaded(false);
+                            logger.error("提交号段预加载任务失败, idCode={}", idCode, e);
+                        }
                     }
                     return queue.poll();
                 } else {
                     if (segmentId.isPreloaded()) {
-                        // 等待异步线程返回
+                        // 等待异步线程返回，带超时，防止无限阻塞
                         try {
-                            segmentId.getFuture().get();
-                        } catch (Exception e) {
-                            logger.error("error query segmentId: {}", e.getMessage(), e);
+                            segmentId.getFuture().get(ASYNC_LOAD_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+                        } catch (InterruptedException e) {
+                            // 恢复中断标志，不吞中断
+                            Thread.currentThread().interrupt();
+                            logger.error("等待号段预加载被中断, idCode={}", idCode, e);
+                            segmentId.setPreloaded(false);
+                        } catch (ExecutionException | TimeoutException e) {
+                            // 复位后跳出等待，下一轮循环走同步兜底
+                            logger.error("等待号段预加载失败, idCode={}", idCode, e);
+                            segmentId.setPreloaded(false);
                         }
+                        // 超时不 cancel：任务可能已更新完 DB，让它跑完把号 offer 进队列，避免已分配的号段丢失
                     } else {
-                        // 第一次加载，按照步长，生成id推送到队列里
+                        // 第一次加载 / 预加载失败后的兜底：同步取号段。
+                        // 这里故意不 catch，配置错误时异常直接抛给调用方快速失败，而不是无限空转
                         List<String> ids = generateNextIds(idCode);
                         ids.forEach(queue::offer);
                     }
@@ -133,6 +167,11 @@ public class SegmentIdService {
     private List<String> generateNextIds(String idCode) {
         // 刷新数据库里的步长
         TIdTable idTable = this.idTableDao.refreshByIdCode(idCode);
+        // 校验步长有效性：step<=0 时 UPDATE 不前进且生成空列表，取号循环会变成打满 DB 的无限循环
+        Integer idStep = idTable.getIdStep();
+        if (idStep == null || idStep < 1) {
+            throw new CoreException(CoreErrorCode.THE_ID_STEP_CONFIG_INVALID);
+        }
         List<String> nextIds = new ArrayList<>();
         // 获取流水号的当前值
         long idValue = idTable.getIdValue();
