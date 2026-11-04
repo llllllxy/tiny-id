@@ -104,55 +104,52 @@ public class SegmentIdService {
         synchronized (segmentId) {
             while (true) {
                 final ConcurrentLinkedQueue<String> queue = segmentId.getQueue();
+                // 「是否有预加载任务在跑」以 Future 是否完成（isDone）为唯一事实来源：
+                // isDone 单调不可逆，无论任务成功、失败还是瞬间完成都不会出现状态错乱
+                Future<?> preloadFuture = segmentId.getPreloadFuture();
+                boolean preloading = preloadFuture != null && !preloadFuture.isDone();
                 if (!queue.isEmpty()) {
                     // 当剩余不足时，异步预加载下一号段
-                    if (!segmentId.isPreloaded() && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
-                        // 先置标志再提交任务：保证异步任务的复位动作必然发生在这之后，
-                        // 避免任务瞬间跑完后标志被主线程覆盖回 true，导致「true 但无任务在跑」的死循环
-                        segmentId.setPreloaded(true);
+                    if (!preloading && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
                         try {
                             Future<?> future = this.asyncServiceExecutor.submit(() -> {
                                 try {
                                     List<String> ids = generateNextIds(idCode);
                                     ids.forEach(queue::offer);
                                 } catch (Exception e) {
-                                    // 预加载失败只记录日志，由取号方感知队列为空后走同步兜底
+                                    // 预加载失败只记录日志，任务结束即 isDone，
+                                    // 由取号方感知队列为空后走同步兜底，无需在任务里复位任何标志
                                     logger.error("异步预加载号段失败, idCode={}", idCode, e);
-                                } finally {
-                                    // 无论成功失败一定复位，否则队列耗尽时取号线程会无限空转
-                                    segmentId.setPreloaded(false);
                                 }
                             });
-                            segmentId.setFuture(future);
+                            segmentId.setPreloadFuture(future);
                         } catch (Exception e) {
-                            // 线程池关闭或饱和导致提交失败时复位标志，否则又是一个卡死入口
-                            segmentId.setPreloaded(false);
+                            // 线程池关闭或饱和导致提交失败：未设置 Future，下轮判定为非预加载中，走同步兜底
                             logger.error("提交号段预加载任务失败, idCode={}", idCode, e);
                         }
                     }
                     return queue.poll();
                 } else {
-                    if (segmentId.isPreloaded()) {
+                    if (preloading) {
                         // 等待异步线程返回，带超时，防止无限阻塞
                         try {
-                            segmentId.getFuture().get(ASYNC_LOAD_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+                            preloadFuture.get(ASYNC_LOAD_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+                            // 任务正常完成，号已入队，继续下一轮从队列取号
+                            continue;
                         } catch (InterruptedException e) {
                             // 恢复中断标志，不吞中断
                             Thread.currentThread().interrupt();
                             logger.error("等待号段预加载被中断, idCode={}", idCode, e);
-                            segmentId.setPreloaded(false);
                         } catch (ExecutionException | TimeoutException e) {
-                            // 复位后跳出等待，下一轮循环走同步兜底
                             logger.error("等待号段预加载失败, idCode={}", idCode, e);
-                            segmentId.setPreloaded(false);
                         }
+                        // 中断/失败/超时后不再等待，直接落到下面的同步兜底。
                         // 超时不 cancel：任务可能已更新完 DB，让它跑完把号 offer 进队列，避免已分配的号段丢失
-                    } else {
-                        // 第一次加载 / 预加载失败后的兜底：同步取号段。
-                        // 这里故意不 catch，配置错误时异常直接抛给调用方快速失败，而不是无限空转
-                        List<String> ids = generateNextIds(idCode);
-                        ids.forEach(queue::offer);
                     }
+                    // 第一次加载 / 预加载失败或超时后的兜底：同步取号段。
+                    // 这里故意不 catch，配置错误时异常直接抛给调用方快速失败，而不是无限空转
+                    List<String> ids = generateNextIds(idCode);
+                    ids.forEach(queue::offer);
                 }
             }
         }

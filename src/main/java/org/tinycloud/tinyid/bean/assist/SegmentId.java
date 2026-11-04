@@ -15,8 +15,8 @@ import java.util.concurrent.Future;
  * <ul>
  *     <li>{@code queue} 缓存一批已从数据库预取的流水号，取号时直接从队列 poll，避免每次都打库；</li>
  *     <li>{@code step} 为号段步长，即每次从数据库预取的 ID 数量，也是触发预加载的基准；</li>
- *     <li>{@code preloaded} 标记当前是否已有「异步预加载下一号段」的任务在进行，避免并发重复预加载；</li>
- *     <li>{@code future} 持有预加载任务的句柄，队列空且正在预加载时，调用方靠它阻塞等待结果返回。</li>
+ *     <li>{@code preloadFuture} 持有「异步预加载下一号段」任务的句柄：非空且未完成即视为预加载中，
+ *     用于避免并发重复预加载；队列空时，调用方靠它阻塞等待预加载结果。</li>
  * </ul>
  *
  * @author liuxingyu01
@@ -35,14 +35,11 @@ public final class SegmentId {
     private final Integer step;
 
     /**
-     * 是否正在进行异步预加载下一号段（true=预加载任务进行中）
+     * 异步预加载任务的句柄。以 {@code isDone()} 作为「是否有预加载任务进行中」的唯一事实来源：
+     * 非空且未完成即预加载中；任务无论成功或失败，完成即视为结束。
+     * 相比独立的布尔标志位，不存在标志与任务真实状态不同步的竞态。
      */
-    private volatile boolean preloaded = false;
-
-    /**
-     * 异步预加载任务句柄，用于队列空时阻塞等待预加载结果
-     */
-    private volatile Future<?> future;
+    private volatile Future<?> preloadFuture;
 
     /**
      * 构造一个号段缓冲实例
@@ -63,19 +60,11 @@ public final class SegmentId {
         return step;
     }
 
-    public boolean isPreloaded() {
-        return preloaded;
+    public Future<?> getPreloadFuture() {
+        return preloadFuture;
     }
 
-    public void setPreloaded(boolean preloaded) {
-        this.preloaded = preloaded;
-    }
-
-    public Future<?> getFuture() {
-        return future;
-    }
-
-    public void setFuture(Future<?> future) {
-        this.future = future;
+    public void setPreloadFuture(Future<?> preloadFuture) {
+        this.preloadFuture = preloadFuture;
     }
 }
