@@ -28,7 +28,7 @@
         .login-form .layui-form-item label {position:absolute;left:1px;top:1px;width:38px;line-height:36px;text-align:center;color:#d2d2d2;}
         .login-form .layui-form-item input {padding-left:36px;}
 
-        .captcha-img img {border:1px solid #e6e6e6;height:36px;width:100%;}
+        .captcha-img img {display:block;border:1px solid #e6e6e6;height:36px;width:100%;cursor:pointer;}
 
         a {
             color: #5E7CE0;
@@ -66,6 +66,21 @@
                     </div>
                 </div>
 
+                <div class="layui-form-item" style="display: flex; align-items: center; gap: 8px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="layui-input-wrap">
+                            <div class="layui-input-prefix">
+                                <i class="layui-icon layui-icon-vercode"></i>
+                            </div>
+                            <input type="text" name="captchaCode" value="" lay-verify="required" placeholder="验证码" lay-reqtext="请填写验证码" autocomplete="off" maxlength="4" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="captcha-img" style="width: 120px; flex-shrink: 0; height: 38px;">
+                        <img id="captchaImg" src="" alt="点击刷新验证码" title="看不清？点击刷新">
+                    </div>
+                    <input type="hidden" name="captchaKey" value="">
+                </div>
+
                 <div class="layui-form-item">
                     <button class="layui-btn layui-btn-fluid" lay-submit lay-filter="login" id="login">登 录</button>
                 </div>
@@ -100,6 +115,35 @@
             lineColor:'#7ec7fd'
         });
 
+        // 加载图形验证码，取回 base64 图片和验证码标识
+        function loadCaptcha() {
+            miniAjax.get({
+                url: '/auth/getCode',
+                // 本系统会话基于 X-Auth-Token 请求头（无 Cookie），
+                // 登录前必须先保存 getCode 响应中的会话标识，登录请求带上它才能命中存验证码的同一个 session
+                complete: function (xhr) {
+                    var token = xhr.getResponseHeader('x-auth-token');
+                    if (token) {
+                        sessionStorage.setItem('token', token);
+                    }
+                },
+                success: function (res) {
+                    if (res.code === 0) {
+                        $('#captchaImg').attr('src', 'data:image/png;base64,' + res.data.img);
+                        $('input[name="captchaKey"]').val(res.data.uuid);
+                        $('input[name="captchaCode"]').val('');
+                    }
+                },
+                error: function (msg) {
+                    layer.msg(msg, {time: 1000, icon: 2});
+                }
+            });
+        }
+
+        // 页面加载和点击图片时刷新验证码
+        loadCaptcha();
+        $('#captchaImg').on('click', loadCaptcha);
+
         // 进行登录操作
         form.on('submit(login)', function (data) {
             data = data.field;
@@ -109,6 +153,10 @@
             }
             if (data.password == '') {
                 layer.msg('密码不能为空');
+                return false;
+            }
+            if (data.captchaCode == '') {
+                layer.msg('验证码不能为空');
                 return false;
             }
             data.password = hex_sha256(data.password + salt);
@@ -129,11 +177,14 @@
                         });
                     } else {
                         layer.msg(res.msg, {time: 1000});
+                        // 验证码一次性消费，登录失败后刷新验证码供重试
+                        loadCaptcha();
                     }
                 },
                 error: function (res) {
                     stopLoading();
                     layer.msg(res, {time: 1000, icon: 2});
+                    loadCaptcha();
                 }
             });
             return false;

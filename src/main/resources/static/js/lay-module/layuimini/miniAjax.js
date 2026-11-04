@@ -122,7 +122,10 @@ layui.define(["jquery"], function (exports) {
                 error: function (XMLHttpRequest, textStatus, errorThrown) {
                     // 错误回调
                     options.error("错误提示： " + XMLHttpRequest.status + " " + XMLHttpRequest.statusText);
-                }
+                },
+                // 透传请求前/完成回调，供调用方读取响应头等场景使用
+                beforeSend: options.beforeSend,
+                complete: options.complete
             });
         },
 

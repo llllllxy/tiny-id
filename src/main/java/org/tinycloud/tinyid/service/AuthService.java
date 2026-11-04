@@ -61,7 +61,16 @@ public class AuthService {
         return vo;
     }
 
-    public void authentication(AuthLoginDto authLoginDto) {
+    public void authentication(AuthLoginDto authLoginDto, HttpSession session) {
+        // 校验图形验证码：先取后删，一次性消费，防止同一验证码重放爆破
+        String captchaKey = GlobalConstant.CAPTCHA_CODE_SESSION_KEY + authLoginDto.getCaptchaKey();
+        String sessionCode = (String) session.getAttribute(captchaKey);
+        session.removeAttribute(captchaKey);
+        // 验证码字符含大小写，忽略大小写比对以降低输入难度
+        if (sessionCode == null || !sessionCode.equalsIgnoreCase(authLoginDto.getCaptchaCode())) {
+            throw new CoreException(CoreErrorCode.THE_CAPTCHA_CODE_IS_INVALID);
+        }
+
         String username = authLoginDto.getUsername();
         String password = authLoginDto.getPassword();
 

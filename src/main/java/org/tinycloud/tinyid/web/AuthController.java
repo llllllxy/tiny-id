@@ -48,8 +48,8 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ApiResult<?> login(@Validated @RequestBody AuthLoginDto authLoginDto, HttpSession session) {
-        // 进行用户名和密码校验
-        authService.authentication(authLoginDto);
+        // 进行验证码、用户名和密码校验
+        authService.authentication(authLoginDto, session);
         // 把username作为loginId，执行会话创建操作
         session.setAttribute(GlobalConstant.SESSION_KEY, authLoginDto.getUsername());
         String token = session.getId();

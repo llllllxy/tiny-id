@@ -26,4 +26,16 @@ public class AuthLoginDto implements Serializable {
 
     @NotEmpty(message = "登录密码不能为空")
     private String password;
+
+    /**
+     * 获取验证码时返回的唯一标识，服务端用它定位 session 中对应的验证码
+     */
+    @NotEmpty(message = "验证码标识不能为空")
+    private String captchaKey;
+
+    /**
+     * 用户输入的图形验证码
+     */
+    @NotEmpty(message = "验证码不能为空")
+    private String captchaCode;
 }
