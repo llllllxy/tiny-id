@@ -31,12 +31,12 @@ public class WorkNodeDao {
 
 
     /**
-     * 获取当前数据中心数量
+     * 获取当前已占用的节点组合数量（去重后的 total_id 数量）
      *
      * @return 数量
      */
-    public Long getDistinctDatacenterIds() {
-        String sql = "SELECT COUNT(*) FROM t_worker_node";
+    public Long getUsedTotalIdCount() {
+        String sql = "SELECT COUNT(DISTINCT total_id) FROM t_worker_node";
         Long count = this.jdbcTemplate.queryForObject(sql, Long.class);
         return count;
     }
@@ -82,8 +82,11 @@ public class WorkNodeDao {
      * @return 成功true, 失败false
      */
     public boolean sign() {
+        if (!SnowflakeSingleton.isInitialized()) {
+            return false;
+        }
         String sql = "UPDATE t_worker_node SET signed_at = ? WHERE datacenter_id = ? AND worker_id = ?";
-        int num = this.jdbcTemplate.update(sql, new Date(), SnowflakeSingleton.datacenterId, SnowflakeSingleton.workerId);
+        int num = this.jdbcTemplate.update(sql, new Date(), SnowflakeSingleton.getDatacenterId(), SnowflakeSingleton.getWorkerId());
         return num > 0;
     }
 

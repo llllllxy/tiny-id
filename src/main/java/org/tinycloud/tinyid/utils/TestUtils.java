@@ -1,5 +1,7 @@
 package org.tinycloud.tinyid.utils;
 
+import org.tinycloud.tinyid.service.SegmentIdService;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -75,6 +77,8 @@ public class TestUtils {
         int threadCount = 100;
         int requestsPerThread = 1000;
 
+        SegmentIdService segmentIdService = SpringUtils.getBean(SegmentIdService.class);
+
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         ConcurrentHashMap<String, Boolean> idMap = new ConcurrentHashMap<>();
         AtomicInteger duplicateCount = new AtomicInteger();
@@ -82,7 +86,7 @@ public class TestUtils {
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 for (int j = 0; j < requestsPerThread; j++) {
-                    String id = IdTableUtils.nextId("TEST_CODE");
+                    String id = segmentIdService.nextId("TEST_CODE");
                     if (idMap.putIfAbsent(id, true) != null) {
                         duplicateCount.incrementAndGet();
                         System.out.println("发现重复ID: " + id);

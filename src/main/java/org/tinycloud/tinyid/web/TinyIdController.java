@@ -1,11 +1,12 @@
 package org.tinycloud.tinyid.web;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.tinycloud.tinyid.model.ApiResult;
-import org.tinycloud.tinyid.utils.IdTableUtils;
+import org.tinycloud.tinyid.service.SegmentIdService;
 import org.tinycloud.tinyid.utils.snowflake.SnowflakeSingleton;
 
 import java.util.List;
@@ -21,6 +22,9 @@ import java.util.List;
 @RequestMapping("/api")
 public class TinyIdController {
 
+    @Autowired
+    private SegmentIdService segmentIdService;
+
     @RequestMapping(value = "/snowflake/get", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<Long> getSnowflakeId() {
         return ApiResult.success(SnowflakeSingleton.nextLongId(), "获取成功");
@@ -33,13 +37,13 @@ public class TinyIdController {
 
     @RequestMapping(value = "/segment/get/{idCode}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<String> getSegment(@PathVariable("idCode") String idCode) {
-        return ApiResult.success(IdTableUtils.nextId(idCode), "获取成功");
+        return ApiResult.success(segmentIdService.nextId(idCode), "获取成功");
     }
 
     @RequestMapping(value = "/segment/batch/{idCode}/{batchSize}", method = {RequestMethod.GET, RequestMethod.POST})
     public ApiResult<List<String>> getSegment(@PathVariable("idCode") String idCode,
                                               @PathVariable("batchSize") Integer batchSize) {
-        return ApiResult.success(IdTableUtils.nextBatchId(idCode, batchSize), "批量获取成功");
+        return ApiResult.success(segmentIdService.nextBatchId(idCode, batchSize), "批量获取成功");
     }
 
     @RequestMapping(value = "/test", method = {RequestMethod.GET, RequestMethod.POST})
