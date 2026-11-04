@@ -1,6 +1,7 @@
 package org.tinycloud.tinyid.service;
 
-import jakarta.servlet.http.HttpSession;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -18,8 +19,11 @@ import org.tinycloud.tinyid.enums.CoreErrorCode;
 import org.tinycloud.tinyid.exception.CoreException;
 import org.tinycloud.tinyid.utils.secure.BCrypt;
 
+import java.time.Duration;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,25 +31,41 @@ import static org.mockito.Mockito.when;
 /**
  * AuthService 登录认证单元测试（纯 Mockito，不依赖数据库）
  *
- * <p>重点覆盖登录验证码校验：正确/错误/过期三种输入路径，以及验证码的一次性消费语义。</p>
+ * <p>重点覆盖登录验证码校验：正确/错误/过期三种输入路径，以及验证码的一次性消费语义。
+ * 验证码存储于 AuthService 内部的 Caffeine 本地缓存（5分钟TTL），测试直接操作真实缓存。</p>
  */
 class AuthServiceTest {
 
     private static final String CAPTCHA_UUID = "key1";
-    private static final String CAPTCHA_SESSION_KEY = GlobalConstant.CAPTCHA_CODE_SESSION_KEY + CAPTCHA_UUID;
+    private static final String CAPTCHA_CACHE_KEY = GlobalConstant.CAPTCHA_CODE_SESSION_KEY + CAPTCHA_UUID;
 
     private AuthService authService;
 
     private UserDao userDao;
 
-    private HttpSession session;
-
     @BeforeEach
     void setUp() {
         userDao = Mockito.mock(UserDao.class);
-        session = Mockito.mock(HttpSession.class);
         authService = new AuthService();
         ReflectionTestUtils.setField(authService, "userDao", userDao);
+    }
+
+    /**
+     * 直接往 AuthService 内部的验证码缓存写入指定验证码（模拟 getCode 的存储动作）
+     */
+    @SuppressWarnings("unchecked")
+    private void putCaptcha(String code) {
+        Cache<String, String> cache = (Cache<String, String>) ReflectionTestUtils.getField(authService, "captchaCache");
+        cache.put(CAPTCHA_CACHE_KEY, code);
+    }
+
+    /**
+     * 直接读取 AuthService 内部的验证码缓存（模拟服务端消费后的状态检查）
+     */
+    @SuppressWarnings("unchecked")
+    private String getCaptcha() {
+        Cache<String, String> cache = (Cache<String, String>) ReflectionTestUtils.getField(authService, "captchaCache");
+        return cache.getIfPresent(CAPTCHA_CACHE_KEY);
     }
 
     private AuthLoginDto buildLoginDto(String captchaCode) {
@@ -73,12 +93,11 @@ class AuthServiceTest {
      */
     @Test
     void correctCaptchaShouldPassAuthentication() {
-        when(session.getAttribute(CAPTCHA_SESSION_KEY)).thenReturn("Ab12");
+        putCaptcha("Ab12");
         when(userDao.getUserByUsername("admin")).thenReturn(buildEnabledUser());
 
         // 忽略大小写比对：Ab12 与 aB12 应视为同一个验证码
-        assertDoesNotThrow(() -> authService.authentication(buildLoginDto("aB12"), session));
-        verify(session).removeAttribute(CAPTCHA_SESSION_KEY);
+        assertDoesNotThrow(() -> authService.authentication(buildLoginDto("aB12")));
     }
 
     /**
@@ -86,39 +105,48 @@ class AuthServiceTest {
      */
     @Test
     void wrongCaptchaShouldFailFast() {
-        when(session.getAttribute(CAPTCHA_SESSION_KEY)).thenReturn("Ab12");
+        putCaptcha("Ab12");
 
         CoreException exception = assertThrows(CoreException.class,
-                () -> authService.authentication(buildLoginDto("zz99"), session));
+                () -> authService.authentication(buildLoginDto("zz99")));
         assertEquals(CoreErrorCode.THE_CAPTCHA_CODE_IS_INVALID.getCode(), exception.getCode());
         verify(userDao, Mockito.never()).getUserByUsername("admin");
     }
 
     /**
-     * 场景：验证码已过期（session 中不存在对应 key）。应抛验证码错误异常。
+     * 场景：验证码已过期（缓存中不存在对应 key，TTL已到或从未生成）。应抛验证码错误异常。
      */
     @Test
     void expiredCaptchaShouldFail() {
-        when(session.getAttribute(CAPTCHA_SESSION_KEY)).thenReturn(null);
-
         CoreException exception = assertThrows(CoreException.class,
-                () -> authService.authentication(buildLoginDto("Ab12"), session));
+                () -> authService.authentication(buildLoginDto("Ab12")));
         assertEquals(CoreErrorCode.THE_CAPTCHA_CODE_IS_INVALID.getCode(), exception.getCode());
     }
 
     /**
-     * 场景：验证码一次性消费。同一验证码第一次认证通过后立即失效，
+     * 场景：验证码一次性消费。同一验证码第一次认证通过后立即从缓存移除，
      * 第二次即使答案完全正确也必须被拒绝（防重放）。
      */
     @Test
     void captchaShouldBeConsumedAfterFirstUse() {
-        when(session.getAttribute(CAPTCHA_SESSION_KEY)).thenReturn("Ab12");
+        putCaptcha("Ab12");
         when(userDao.getUserByUsername("admin")).thenReturn(buildEnabledUser());
 
-        assertDoesNotThrow(() -> authService.authentication(buildLoginDto("Ab12"), session));
-        // 模拟服务端已消费：第二次取不到验证码
-        when(session.getAttribute(CAPTCHA_SESSION_KEY)).thenReturn(null);
-        assertThrows(CoreException.class, () -> authService.authentication(buildLoginDto("Ab12"), session));
+        assertDoesNotThrow(() -> authService.authentication(buildLoginDto("Ab12")));
+        // 消费后缓存中不应再有该验证码
+        assertNull(getCaptcha());
+        assertThrows(CoreException.class, () -> authService.authentication(buildLoginDto("Ab12")));
+    }
+
+    /**
+     * 场景：验证码错误也会消费掉该 key，防止同一 key 反复试错（穷举验证码）。
+     */
+    @Test
+    void wrongAttemptShouldAlsoConsumeCaptcha() {
+        putCaptcha("Ab12");
+
+        assertThrows(CoreException.class, () -> authService.authentication(buildLoginDto("zz99")));
+        assertNull(getCaptcha());
     }
 
     /**

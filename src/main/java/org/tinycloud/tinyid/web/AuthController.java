@@ -1,8 +1,7 @@
 package org.tinycloud.tinyid.web;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -32,28 +31,32 @@ import java.util.Map;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-    final static Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
     private AuthService authService;
 
     @GetMapping("/getCode")
     @ResponseBody
-    public ApiResult<CaptchaCodeVo> getCode(HttpSession session) {
-        return ApiResult.success(authService.getCode(session), "获取验证码成功");
+    public ApiResult<CaptchaCodeVo> getCode() {
+        return ApiResult.success(authService.getCode(), "获取验证码成功");
     }
 
     /**
      * 登录
      */
     @PostMapping("/login")
-    public ApiResult<?> login(@Validated @RequestBody AuthLoginDto authLoginDto, HttpSession session) {
+    public ApiResult<?> login(@Validated @RequestBody AuthLoginDto authLoginDto, HttpServletRequest request) {
         // 进行验证码、用户名和密码校验
-        authService.authentication(authLoginDto, session);
-        // 把username作为loginId，执行会话创建操作
+        authService.authentication(authLoginDto);
+        // 会话固定防护：登录成功后废弃旧会话，换发全新session id（token）
+        HttpSession oldSession = request.getSession(false);
+        if (oldSession != null) {
+            oldSession.invalidate();
+        }
+        // 把username作为loginId写入新会话
+        HttpSession session = request.getSession();
         session.setAttribute(GlobalConstant.SESSION_KEY, authLoginDto.getUsername());
         String token = session.getId();
-        logger.info("token = " + token);
         return ApiResult.success(token, "登录成功，欢迎回来！");
     }
 

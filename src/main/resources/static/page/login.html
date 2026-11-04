@@ -115,18 +115,10 @@
             lineColor:'#7ec7fd'
         });
 
-        // 加载图形验证码，取回 base64 图片和验证码标识
+        // 加载图形验证码，取回 base64 图片和验证码标识（验证码存于服务端本地缓存，与session无关）
         function loadCaptcha() {
             miniAjax.get({
                 url: '/auth/getCode',
-                // 本系统会话基于 X-Auth-Token 请求头（无 Cookie），
-                // 登录前必须先保存 getCode 响应中的会话标识，登录请求带上它才能命中存验证码的同一个 session
-                complete: function (xhr) {
-                    var token = xhr.getResponseHeader('x-auth-token');
-                    if (token) {
-                        sessionStorage.setItem('token', token);
-                    }
-                },
                 success: function (res) {
                     if (res.code === 0) {
                         $('#captchaImg').attr('src', 'data:image/png;base64,' + res.data.img);

@@ -44,6 +44,11 @@
             <artifactId>angus-mail</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!--本地缓存（图形验证码存储，带TTL自动过期）-->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
