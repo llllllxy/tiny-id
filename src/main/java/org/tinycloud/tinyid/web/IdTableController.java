@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.tinycloud.tinyid.bean.dto.IdTableAddDto;
+import org.tinycloud.tinyid.bean.dto.IdTableDelDto;
 import org.tinycloud.tinyid.bean.dto.IdTableEditDto;
 import org.tinycloud.tinyid.bean.dto.IdTableQueryDto;
 import org.tinycloud.tinyid.bean.vo.IdTableVo;
@@ -30,9 +31,12 @@ public class IdTableController {
         return ApiResult.success(idTableService.query(dto), "查询成功!");
     }
 
-    @GetMapping("/del")
-    public ApiResult<Boolean> delete(@RequestParam(value = "id", required = true) Long id) {
-        return ApiResult.success(idTableService.delete(id), "删除成功!");
+    /**
+     * 删除流水号配置（状态变更操作使用POST+JSON body，与其他写接口风格一致，避免GET形式被预取/误触发）
+     */
+    @PostMapping("/del")
+    public ApiResult<Boolean> delete(@Validated @RequestBody IdTableDelDto dto) {
+        return ApiResult.success(idTableService.delete(dto.getId()), "删除成功!");
     }
 
     @PostMapping("/add")

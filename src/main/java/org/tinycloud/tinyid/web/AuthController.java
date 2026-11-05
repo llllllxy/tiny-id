@@ -166,6 +166,6 @@ public class AuthController {
     @PostMapping("/setting")
     public ApiResult<?> setting(@Validated @RequestBody AuthEditInfoDto dto) {
         boolean result = authService.setting(dto);
-        return ApiResult.success(result, "修改密码成功！");
+        return ApiResult.success(result, "修改成功！");
     }
 }

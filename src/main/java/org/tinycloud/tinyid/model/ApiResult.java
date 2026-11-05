@@ -84,7 +84,7 @@ public class ApiResult<T> {
     }
 
     public static ApiResult<?> fail(CommonCode error) {
-        return new ApiResult<>(error.getCode(), null, error.getDesc());
+        return new ApiResult<>(error.getCode(), error.getDesc(), null);
     }
 
     public static <T> ApiResult<T> fail(CommonCode error, T data) {

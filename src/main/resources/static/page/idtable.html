@@ -485,8 +485,9 @@
             } else if (obj.event === 'delete') {
                 layer.confirm('确定删除此流水号吗', function (index) {
                     layer.close(index);
-                    miniAjax.get({
-                        url: '/idtable/del?id=' + lineData.id,
+                    miniAjax.postJSON({
+                        url: '/idtable/del',
+                        data: JSON.stringify({id: lineData.id}),
                         success: function (res) {
                             if (res.code == '0') {
                                 layer.msg(res.msg, {time: 1000, icon: 1}, function () {

@@ -120,6 +120,10 @@ public class AuthService {
         }
         String username = (String) AuthUtils.getLoginId();
         TUser entity = this.userDao.getUserByUsername(username);
+        // 登录期间账号被删除的防御：entity为null时直接按账号密码错误处理，避免NPE
+        if (Objects.isNull(entity)) {
+            throw new CoreException(CoreErrorCode.USERNAME_OR_PASSWORD_MISMATCH);
+        }
         String encodedPassword = entity.getPassword();
         boolean checkResult = BCrypt.checkpw(dto.getOldPassword() + SALT, encodedPassword);
         // 原始密码错误
