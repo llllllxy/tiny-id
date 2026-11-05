@@ -28,6 +28,9 @@ public class IdTableService {
     @Autowired
     private IdTableDao idTableDao;
 
+    @Autowired
+    private SegmentIdService segmentIdService;
+
     public PageModel<IdTableVo> query(IdTableQueryDto dto) {
         PageModel<IdTableVo> responsePage = new PageModel<>(dto.getPageNo(), dto.getPageSize());
         List<TIdTable> nodeList = this.idTableDao.pageList(dto);
@@ -43,8 +46,16 @@ public class IdTableService {
         return responsePage;
     }
 
+    /**
+     * 删除流水号配置，并使本实例的内存号段缓冲失效（分布式下其余实例靠自然耗尽后续段生效）
+     */
     public boolean delete(Long id) {
-        return this.idTableDao.delete(id);
+        TIdTable old = this.idTableDao.getById(id);
+        boolean result = this.idTableDao.delete(id);
+        if (result && old != null) {
+            this.segmentIdService.invalidate(old.getIdCode());
+        }
+        return result;
     }
 
     public boolean add(IdTableAddDto dto) {
@@ -52,7 +63,15 @@ public class IdTableService {
     }
 
 
+    /**
+     * 修改流水号配置，并使本实例的内存号段缓冲失效（分布式下其余实例靠自然耗尽后续段生效）
+     */
     public boolean edit(IdTableEditDto dto) {
-        return this.idTableDao.edit(dto);
+        TIdTable old = this.idTableDao.getById(dto.getId());
+        boolean result = this.idTableDao.edit(dto);
+        if (result && old != null) {
+            this.segmentIdService.invalidate(old.getIdCode());
+        }
+        return result;
     }
 } 

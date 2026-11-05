@@ -7,6 +7,7 @@ public enum CoreErrorCode {
     THE_ID_STEP_CONFIG_INVALID(1004, "步长配置无效，必须为大于0的整数！"),
     THE_BATCH_SIZE_IS_INVALID(1005, "批量大小无效，必须为1~1000之间的整数！"),
     THE_CAPTCHA_CODE_IS_INVALID(1006, "验证码错误或已过期，请重新输入！"),
+    SEGMENT_REFRESH_FAILED(1007, "号段刷新失败，请检查流水号配置！"),
 
     USERNAME_OR_PASSWORD_MISMATCH(2001, "用户名或密码错误！"),
     USER_IS_DISABLED(2002, "用户已被停用！"),

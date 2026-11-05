@@ -3,10 +3,9 @@ package org.tinycloud.tinyid.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
-import org.tinycloud.tinyid.bean.assist.SegmentId;
+import org.springframework.util.StringUtils;
+import org.tinycloud.tinyid.bean.assist.SegmentBuffer;
 import org.tinycloud.tinyid.bean.entity.TIdTable;
 import org.tinycloud.tinyid.constant.GlobalConstant;
 import org.tinycloud.tinyid.dao.IdTableDao;
@@ -17,21 +16,20 @@ import org.tinycloud.tinyid.utils.AffixFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
- * <p>
- * 号段生成服务：负责按号段模式生成业务流水号
- * </p>
+ * 号段模式发号服务。
  *
- * <p>每个 idCode 维护一个号段队列，首次同步加载 step 个号，</p>
- * <p>之后当队列剩余低于阈值时异步预加载下一号段，避免取号阻塞在数据库上。</p>
+ * <p>每个流水号标识在内存中持有一个 {@link SegmentBuffer} 游标；号段耗尽时通过
+ * {@code UPDATE t_idtable SET id_value = id_value + id_step} 原子申请下一段，
+ * 其余取号都是内存自增，不访问数据库。数据库只持久化「已推进到的最大值」，
+ * 因此进程重启会跳过未发出的号，但不会重复或回退。</p>
+ *
+ * <p>采用游标而非「预生成整段字符串 + 异步预加载」：无异步依赖，不存在预加载
+ * 任务失败/丢弃引发的取号阻塞；前后缀的时间占位符在每次取号时解析，跨天不会
+ * 沿用旧日期。代价是号段耗尽时调用线程同步等待一次数据库往返，可通过调大
+ * {@code id_step} 摊薄。</p>
  *
  * @author liuxingyu01
  * @since 2024-04-27 20:20
@@ -41,182 +39,158 @@ public class SegmentIdService {
     private static final Logger logger = LoggerFactory.getLogger(SegmentIdService.class);
 
     /**
-     * 等待异步预加载号段的最长等待时间（毫秒）。
-     * 取号段是单次 DB 查询，正常几十毫秒；超时说明预加载已异常，走同步兜底快速失败，
-     * 不宜设太长，否则会长时间占用工作线程，并发高时拖垮整个服务。
+     * 流水号标识 -> 内存号段缓冲
      */
-    private static final long ASYNC_LOAD_TIMEOUT_MILLIS = 5000L;
+    private final Map<String, SegmentBuffer> segmentCacheMap = new ConcurrentHashMap<>();
 
     @Autowired
     private IdTableDao idTableDao;
 
-    @Qualifier("asyncServiceExecutor")
-    @Autowired
-    private ThreadPoolTaskExecutor asyncServiceExecutor;
-
     /**
-     * idCode -> 号段缓存
-     */
-    private final Map<String, SegmentId> segmentIdCacheMap = new ConcurrentHashMap<>();
-
-    /**
-     * 获取下一个流水号字符串
+     * 获取指定流水号标识的下一个号码。
      *
-     * @param idCode 流水号编码
-     * @return String 流水号字符串
+     * @param idCode 流水号标识编码
+     * @return 形如「前缀 + 补零数字 + 后缀」的流水号
      */
     public String nextId(String idCode) {
-        return takeNextId(idCode);
+        this.requireIdCode(idCode);
+        return this.takeNextId(idCode);
     }
 
     /**
-     * 批量获取流水号字符串
+     * 批量获取指定流水号标识的号码，允许跨号段。
      *
-     * @param idCode    流水号编码
-     * @param batchSize 批量大小
-     * @return 流水号列表
+     * @param idCode    流水号标识编码
+     * @param batchSize 数量，取值范围 1~1000
+     * @return 按取号顺序排列的流水号列表
      */
     public List<String> nextBatchId(String idCode, Integer batchSize) {
-        // 校验批量大小：防止拆箱 NPE、负数或 0，以及超大批量在循环中反复触发号段加载刷库
+        this.requireIdCode(idCode);
         if (batchSize == null || batchSize < 1 || batchSize > GlobalConstant.MAX_BATCH_SIZE) {
             throw new CoreException(CoreErrorCode.THE_BATCH_SIZE_IS_INVALID);
         }
-        // 预分配容量，避免批量较大时 ArrayList 反复扩容拷贝
-        List<String> idList = new ArrayList<>(batchSize);
+        List<String> ids = new ArrayList<>(batchSize);
         for (int i = 0; i < batchSize; i++) {
-            idList.add(this.takeNextId(idCode));
+            ids.add(this.takeNextId(idCode));
         }
-        return idList;
+        return ids;
     }
 
     /**
-     * 获取下一个流水号字符串
+     * 使指定流水号标识的内存缓冲失效，仅用于单实例运维场景。
      *
-     * @param idCode 流水号编码
-     * @return String 流水号字符串
+     * <p>分布式部署下不应由管理台调用：只会清掉当前实例，其余实例仍按旧配置发号。
+     * 配置变更的约定是各实例把已分配号段自然取完后，下一次续段再读回最新配置。</p>
+     *
+     * @param idCode 流水号标识编码
+     */
+    public void invalidate(String idCode) {
+        if (!StringUtils.hasText(idCode)) {
+            return;
+        }
+        SegmentBuffer buffer = this.segmentCacheMap.get(idCode);
+        if (buffer != null) {
+            buffer.markStale();
+            this.segmentCacheMap.remove(idCode, buffer);
+        }
+    }
+
+    /**
+     * 校验流水号标识非空。
+     *
+     * @param idCode 流水号标识编码
+     */
+    private void requireIdCode(String idCode) {
+        if (!StringUtils.hasText(idCode)) {
+            throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
+        }
+    }
+
+    /**
+     * 从内存缓冲取一个号码，必要时续段。
+     *
+     * <p>{@code computeIfAbsent} 只做纯内存创建，数据库访问全部放在按缓冲加锁之后，
+     * 避免把慢操作放进 ConcurrentHashMap 的桶锁；{@code synchronized} 保证同一标识
+     * 在本实例内只有一个线程续段，跨实例由数据库行锁保证。</p>
+     *
+     * @param idCode 流水号标识编码
+     * @return 流水号
      */
     private String takeNextId(String idCode) {
-        // 使用computeIfAbsent确保每个idCode只有一个SegmentId
-        final SegmentId segmentId = this.segmentIdCacheMap.computeIfAbsent(idCode, key -> {
-            TIdTable idTable = this.idTableDao.get(key);
-            if (idTable == null) {
-                throw new CoreException(CoreErrorCode.THIS_IDCODE_IS_NOT_EXIST);
-            }
-            ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
-            return new SegmentId(queue, idTable.getIdStep());
-        });
-
-        synchronized (segmentId) {
-            while (true) {
-                final ConcurrentLinkedQueue<String> queue = segmentId.getQueue();
-                // 「是否有预加载任务在跑」以 Future 是否完成（isDone）为唯一事实来源：
-                // isDone 单调不可逆，无论任务成功、失败还是瞬间完成都不会出现状态错乱
-                Future<?> preloadFuture = segmentId.getPreloadFuture();
-                boolean preloading = preloadFuture != null && !preloadFuture.isDone();
-                if (!queue.isEmpty()) {
-                    // 当剩余不足时，异步预加载下一号段
-                    if (!preloading && queue.size() <= (segmentId.getStep() * GlobalConstant.LOADING_PERCENT / 100)) {
-                        try {
-                            Future<?> future = this.asyncServiceExecutor.submit(() -> {
-                                try {
-                                    List<String> ids = generateNextIds(idCode);
-                                    ids.forEach(queue::offer);
-                                } catch (Exception e) {
-                                    // 预加载失败只记录日志，任务结束即 isDone，
-                                    // 由取号方感知队列为空后走同步兜底，无需在任务里复位任何标志
-                                    logger.error("异步预加载号段失败, idCode={}", idCode, e);
-                                }
-                            });
-                            segmentId.setPreloadFuture(future);
-                        } catch (Exception e) {
-                            // 线程池关闭或饱和导致提交失败：未设置 Future，下轮判定为非预加载中，走同步兜底
-                            logger.error("提交号段预加载任务失败, idCode={}", idCode, e);
-                        }
-                    }
-                    return queue.poll();
-                } else {
-                    if (preloading) {
-                        // 等待异步线程返回，带超时，防止无限阻塞
-                        try {
-                            preloadFuture.get(ASYNC_LOAD_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
-                            // 任务正常完成，号已入队，继续下一轮从队列取号
-                            continue;
-                        } catch (InterruptedException e) {
-                            // 恢复中断标志，不吞中断
-                            Thread.currentThread().interrupt();
-                            logger.error("等待号段预加载被中断, idCode={}", idCode, e);
-                        } catch (ExecutionException | TimeoutException e) {
-                            logger.error("等待号段预加载失败, idCode={}", idCode, e);
-                        }
-                        // 中断/失败/超时后不再等待，直接落到下面的同步兜底。
-                        // 超时不 cancel：任务可能已更新完 DB，让它跑完把号 offer 进队列，避免已分配的号段丢失
-                    }
-                    // 第一次加载 / 预加载失败或超时后的兜底：同步取号段。
-                    // 这里故意不 catch，配置错误时异常直接抛给调用方快速失败，而不是无限空转
-                    List<String> ids = generateNextIds(idCode);
-                    ids.forEach(queue::offer);
+        while (true) {
+            SegmentBuffer buffer = this.segmentCacheMap.computeIfAbsent(idCode, key -> new SegmentBuffer());
+            synchronized (buffer) {
+                if (buffer.isStale()) {
+                    this.segmentCacheMap.remove(idCode, buffer);
+                    continue;
                 }
+                if (buffer.exhausted()) {
+                    this.reload(idCode, buffer);
+                }
+                // 先按配置拼装成功再推进游标，配置错误时不会白白丢号
+                long value = buffer.getCursor() + 1;
+                String id;
+                try {
+                    id = this.format(buffer.getConfig(), value);
+                } catch (RuntimeException e) {
+                    // 格式化失败说明配置快照有问题：丢弃缓冲，下次请求重读最新配置，
+                    // 避免坏快照一直留在内存里导致修复配置后也无法自愈
+                    buffer.markStale();
+                    this.segmentCacheMap.remove(idCode, buffer);
+                    throw e;
+                }
+                buffer.next();
+                return id;
             }
         }
     }
 
     /**
-     * 批量构造流水号字符串
+     * 向数据库申请新号段并装载到缓冲。
      *
-     * @param idCode idCode
-     * @return 流水号List列表
+     * @param idCode 流水号标识编码
+     * @param buffer 该标识的内存缓冲
      */
-    private List<String> generateNextIds(String idCode) {
-        // 刷新数据库里的步长
-        TIdTable idTable = this.idTableDao.refreshByIdCode(idCode);
-        // 校验步长有效性：step<=0 时 UPDATE 不前进且生成空列表，取号循环会变成打满 DB 的无限循环
-        Integer idStep = idTable.getIdStep();
-        if (idStep == null || idStep < 1) {
-            throw new CoreException(CoreErrorCode.THE_ID_STEP_CONFIG_INVALID);
-        }
-        List<String> nextIds = new ArrayList<>();
-        // 获取流水号的当前值
-        long idValue = idTable.getIdValue();
-        // 循环获取step个流水号，放入nextIds中去
-        for (int i = idTable.getIdStep() - 1; i >= 0; i--) {
-            long nextIdValue = idValue - i;
-            String nextId = generateNextId(idTable, nextIdValue);
-            nextIds.add(nextId);
-        }
-        return nextIds;
-    }
-
-    /**
-     * 根据规则构造流水号字符串
-     *
-     * @param idTable     流水号规则配置
-     * @param nextIdValue 流水号当前数值
-     * @return String 流水号字符串
-     */
-    private String generateNextId(TIdTable idTable, long nextIdValue) {
+    private void reload(String idCode, SegmentBuffer buffer) {
         try {
-            // 1. 统一处理前缀和后缀
-            String prefix = AffixFormatter.compoundAffix(idTable.getHasPrefix(), idTable.getIdPrefix());
-            String suffix = AffixFormatter.compoundAffix(idTable.getHasSuffix(), idTable.getIdSuffix());
-            // 2. 使用 Optional 安全地获取 ID 长度
-            int totalLength = Optional.ofNullable(idTable.getIdLength()).orElseThrow(() -> new CoreException(CoreErrorCode.THE_ID_LENGTH_CONFIG_MISSING));
-            // 3. 计算数字部分的长度
-            int numericPartLength = totalLength - prefix.length() - suffix.length();
-            // 4. 校验数字部分长度是否足够
-            if (numericPartLength < Long.toString(nextIdValue).length()) {
-                throw new CoreException(CoreErrorCode.THE_ID_LENGTH_IS_NOT_ENOUGH);
+            TIdTable config = this.idTableDao.refreshByIdCode(idCode);
+            Integer step = config.getIdStep();
+            if (step == null || step < 1) {
+                throw new CoreException(CoreErrorCode.THE_ID_STEP_CONFIG_INVALID);
             }
-            // 5. 拼接最终的流水号
-            String paddedNumber = AffixFormatter.getPaddedNumber(nextIdValue, numericPartLength);
-            return prefix + paddedNumber + suffix;
-        } catch (CoreException e) {
-            // 6. 只记录日志，直接抛出原始的业务异常，不进行包装
-            logger.error("生成业务流水号[{}]失败: {}", idTable.getIdCode(), e.getMessage(), e);
+            Long max = config.getIdValue();
+            if (max == null || max < step) {
+                throw new CoreException(CoreErrorCode.SEGMENT_REFRESH_FAILED);
+            }
+            buffer.reset(max - step, max, config);
+        } catch (RuntimeException e) {
+            // 续段失败后不能留一个半初始化的缓冲，否则后续请求会一直用它尝试
+            buffer.markStale();
+            this.segmentCacheMap.remove(idCode, buffer);
+            logger.error("刷新号段失败, idCode={}", idCode, e);
             throw e;
-        } catch (Exception e) {
-            // 7. 捕获所有其他非预期异常，包装成系统级严重错误
-            logger.error("生成业务流水号[{}]时发生未知错误", idTable.getIdCode(), e);
-            throw new CoreException(CoreErrorCode.SERIOUSLY_ERROR);
         }
+    }
+
+    /**
+     * 按当前配置把数值拼装成完整流水号，并校验总长度是否放得下数字部分。
+     *
+     * @param config 最近一次续段读回的配置
+     * @param value  流水号数值
+     * @return 完整流水号
+     */
+    private String format(TIdTable config, long value) {
+        if (config == null || config.getIdLength() == null) {
+            throw new CoreException(CoreErrorCode.THE_ID_LENGTH_CONFIG_MISSING);
+        }
+        int totalLength = config.getIdLength();
+        // 前后缀的时间占位符按取号时刻解析，跨天不会沿用号段装载时的旧日期
+        String prefix = AffixFormatter.compoundAffix(config.getHasPrefix(), config.getIdPrefix());
+        String suffix = AffixFormatter.compoundAffix(config.getHasSuffix(), config.getIdSuffix());
+        int numericLength = totalLength - prefix.length() - suffix.length();
+        if (Long.toString(value).length() > numericLength) {
+            throw new CoreException(CoreErrorCode.THE_ID_LENGTH_IS_NOT_ENOUGH);
+        }
+        return prefix + AffixFormatter.getPaddedNumber(value, numericLength) + suffix;
     }
 }

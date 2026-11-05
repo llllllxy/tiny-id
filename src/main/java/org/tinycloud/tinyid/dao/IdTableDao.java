@@ -78,6 +78,22 @@ public class IdTableDao {
     }
 
     /**
+     * 按主键获取单条流水号信息
+     *
+     * @param id 主键
+     * @return TIdTable，不存在返回null
+     */
+    public TIdTable getById(Long id) {
+        String sql = "SELECT * FROM t_idtable WHERE id = ?";
+        List<TIdTable> list = this.jdbcTemplate.query(sql, BeanPropertyRowMapper.newInstance(TIdTable.class), id);
+        if (CollectionUtils.isEmpty(list)) {
+            return null;
+        } else {
+            return list.get(0);
+        }
+    }
+
+    /**
      * 获取总数
      *
      * @return 流水号总数

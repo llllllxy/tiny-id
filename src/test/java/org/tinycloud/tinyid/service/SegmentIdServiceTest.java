@@ -3,7 +3,6 @@ package org.tinycloud.tinyid.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.tinycloud.tinyid.bean.entity.TIdTable;
 import org.tinycloud.tinyid.dao.IdTableDao;
@@ -18,16 +17,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
- * SegmentIdService 号段取号单元测试（纯 Mockito，不依赖数据库）
+ * SegmentIdService 号段发号单元测试（纯 Mockito，不依赖数据库）
  *
- * <p>重点覆盖修复后的三条关键路径：</p>
- * <ul>
- *     <li>异步预加载失败后不挂死，能通过同步兜底自恢复且不产生重号；</li>
- *     <li>id_step 配置非法（<=0 或 null）时快速失败，而不是无限循环打库；</li>
- *     <li>正常路径取号连续、无重号。</li>
- * </ul>
+ * <p>覆盖游标方案的关键行为：正常连续取号、批量参数校验、
+ * 配置错误时的快速失败与自愈（坏缓冲丢弃后可恢复，无需重启）。</p>
  */
 class SegmentIdServiceTest {
 
@@ -40,83 +38,32 @@ class SegmentIdServiceTest {
     @BeforeEach
     void setUp() {
         idTableDao = Mockito.mock(IdTableDao.class);
-        // 使用真实的线程池，覆盖异步预加载的真实调度路径
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(2);
-        executor.setQueueCapacity(10);
-        executor.initialize();
         segmentIdService = new SegmentIdService();
         ReflectionTestUtils.setField(segmentIdService, "idTableDao", idTableDao);
-        ReflectionTestUtils.setField(segmentIdService, "asyncServiceExecutor", executor);
     }
 
     /**
-     * 构造一条流水号规则配置（无前后缀，编码总长 5 位，纯数字）
+     * 构造一条流水号规则配置（无前后缀，纯数字）
      */
-    private TIdTable buildIdTable(long idValue, int idStep) {
+    private TIdTable buildIdTable(long idValue, int idStep, int idLength) {
         TIdTable idTable = new TIdTable();
         idTable.setIdCode(ID_CODE);
         idTable.setIdValue(idValue);
         idTable.setIdStep(idStep);
-        idTable.setIdLength(5);
+        idTable.setIdLength(idLength);
         idTable.setHasPrefix(0);
         idTable.setHasSuffix(0);
         return idTable;
     }
 
     /**
-     * 场景：第一次同步加载成功取到 [1,5]，触发的异步预加载（第二次刷新）抛异常，
-     * 队列耗尽后应通过同步兜底（第三次刷新）取到 [6,10]。
-     * 修复前该场景会导致 preloaded 永久卡在 true，取号线程无限空转。
-     */
-    @Test
-    void preloadFailureShouldNotHangAndShouldRecover() {
-        Mockito.when(idTableDao.get(ID_CODE)).thenReturn(buildIdTable(0L, 5));
-        AtomicInteger refreshCount = new AtomicInteger();
-        Mockito.when(idTableDao.refreshByIdCode(ID_CODE)).thenAnswer(invocation -> {
-            int n = refreshCount.incrementAndGet();
-            if (n == 2) {
-                // 模拟异步预加载时 DB 抖动
-                throw new CoreException(CoreErrorCode.SERIOUSLY_ERROR);
-            }
-            // 第一次同步加载返回 [1,5]，第三次兜底加载返回 [6,10]
-            return buildIdTable(n == 1 ? 5L : 10L, 5);
-        });
-
-        Set<String> ids = new HashSet<>();
-        // 用超时断言保证「不挂死」：修复前这里会无限空转导致用例超时失败
-        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
-            for (int i = 0; i < 10; i++) {
-                ids.add(segmentIdService.nextId(ID_CODE));
-            }
-        });
-        assertEquals(10, ids.size(), "10 次取号应全部成功且无重号");
-    }
-
-    /**
-     * 场景：id_step 配置为 0。refreshByIdCode 正常返回但生成空号段，
-     * 应快速抛出业务异常，而不是在取号循环里无限打库。
-     */
-    @Test
-    void invalidStepShouldFailFast() {
-        Mockito.when(idTableDao.get(ID_CODE)).thenReturn(buildIdTable(0L, 0));
-        Mockito.when(idTableDao.refreshByIdCode(ID_CODE)).thenReturn(buildIdTable(100L, 0));
-
-        assertTimeoutPreemptively(Duration.ofSeconds(5), () ->
-                assertThrows(CoreException.class, () -> segmentIdService.nextId(ID_CODE)));
-    }
-
-    /**
-     * 场景：正常回归。步长 10，取 25 个号，需要跨 3 个号段，
-     * 断言结果连续、无重号且含异步预加载路径（剩余低于阈值时触发）。
+     * 场景：正常回归。步长10取25个号跨3个号段，结果连续、无重号。
      */
     @Test
     void normalPathShouldReturnUniqueIds() {
-        Mockito.when(idTableDao.get(ID_CODE)).thenReturn(buildIdTable(0L, 10));
         AtomicInteger idValue = new AtomicInteger(0);
-        Mockito.when(idTableDao.refreshByIdCode(ID_CODE)).thenAnswer(invocation ->
-                buildIdTable(idValue.addAndGet(10), 10));
+        when(idTableDao.refreshByIdCode(ID_CODE)).thenAnswer(invocation ->
+                buildIdTable(idValue.addAndGet(10), 10, 5));
 
         Set<String> ids = new HashSet<>();
         assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
@@ -132,21 +79,70 @@ class SegmentIdServiceTest {
     }
 
     /**
-     * 场景：批量大小入参防御。null、0、负数、超过上限都应快速抛业务异常，
-     * 尤其超大批量不能进入取号循环反复打库。
+     * 场景：批量大小入参防御。null、0、负数、超过上限都应快速抛业务异常。
      */
     @Test
     void batchSizeValidationShouldRejectInvalidValues() {
-        Mockito.when(idTableDao.get(ID_CODE)).thenReturn(buildIdTable(0L, 10));
-        Mockito.when(idTableDao.refreshByIdCode(ID_CODE)).thenReturn(buildIdTable(10L, 10));
+        when(idTableDao.refreshByIdCode(ID_CODE)).thenReturn(buildIdTable(1000L, 1000, 5));
 
         assertThrows(CoreException.class, () -> segmentIdService.nextBatchId(ID_CODE, null), "null 应拒绝");
         assertThrows(CoreException.class, () -> segmentIdService.nextBatchId(ID_CODE, 0), "0 应拒绝");
         assertThrows(CoreException.class, () -> segmentIdService.nextBatchId(ID_CODE, -1), "负数应拒绝");
         assertThrows(CoreException.class, () -> segmentIdService.nextBatchId(ID_CODE, 1001), "超过上限应拒绝");
-        Mockito.verify(idTableDao, Mockito.never()).refreshByIdCode(ID_CODE);
+        verify(idTableDao, Mockito.never()).refreshByIdCode(ID_CODE);
 
         // 上限边界值应正常放行
         assertEquals(1000, segmentIdService.nextBatchId(ID_CODE, 1000).size());
+    }
+
+    /**
+     * 场景：id_step 配置非法（0）。应快速抛业务异常；
+     * 坏缓冲被丢弃，配置修复后下一次调用即可自愈，无需重启。
+     */
+    @Test
+    void invalidStepShouldFailFastThenSelfHeal() {
+        when(idTableDao.refreshByIdCode(ID_CODE))
+                .thenReturn(buildIdTable(100L, 0, 5))
+                .thenReturn(buildIdTable(105L, 5, 5));
+
+        CoreException exception = assertThrows(CoreException.class,
+                () -> segmentIdService.nextId(ID_CODE));
+        assertEquals(CoreErrorCode.THE_ID_STEP_CONFIG_INVALID.getCode(), exception.getCode());
+
+        // 配置修复后自愈
+        assertEquals("00101", segmentIdService.nextId(ID_CODE));
+    }
+
+    /**
+     * 场景：格式化失败（编码长度放不下数字）不应毒化缓冲。
+     * 修复配置后下一次调用即可自愈，这是游标方案必须保证的关键行为。
+     */
+    @Test
+    void formatFailureShouldNotPoisonBuffer() {
+        when(idTableDao.refreshByIdCode(ID_CODE))
+                .thenReturn(buildIdTable(5L, 5, 0))
+                .thenReturn(buildIdTable(10L, 5, 5));
+
+        CoreException exception = assertThrows(CoreException.class,
+                () -> segmentIdService.nextId(ID_CODE));
+        assertEquals(CoreErrorCode.THE_ID_LENGTH_IS_NOT_ENOUGH.getCode(), exception.getCode());
+
+        // 配置修复后自愈：拿到 [6,10] 段的第一个号
+        assertEquals("00006", segmentIdService.nextId(ID_CODE));
+    }
+
+    /**
+     * 场景：idCode 已被删除。refreshByIdCode 命中0行抛异常，
+     * 每次调用都应重新尝试（不缓存失败结果），异常向上传播由调用方感知。
+     */
+    @Test
+    void deletedIdCodeShouldPropagateErrorAndRetry() {
+        when(idTableDao.refreshByIdCode(ID_CODE))
+                .thenThrow(new IllegalStateException("刷新流水号失败"))
+                .thenThrow(new IllegalStateException("刷新流水号失败"));
+
+        assertThrows(IllegalStateException.class, () -> segmentIdService.nextId(ID_CODE));
+        assertThrows(IllegalStateException.class, () -> segmentIdService.nextId(ID_CODE));
+        verify(idTableDao, times(2)).refreshByIdCode(ID_CODE);
     }
 }
